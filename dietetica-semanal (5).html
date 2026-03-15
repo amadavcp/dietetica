@@ -6,10 +6,9 @@
 <title>Dietética Semanal</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, get, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDvqDq1CqtQhboBvJepY1fFAKhuFai-uRw",
@@ -22,51 +21,39 @@
   };
 
   let db;
-  let historialGlobal = [];
-
   try {
     const app = initializeApp(firebaseConfig);
     db = getDatabase(app);
     window._db = db;
-    window._dbRef = ref;
-    window._dbSet = set;
-    window._dbGet = get;
-    window._dbPush = push;
-    window._dbOnValue = onValue;
     window._firebaseOk = true;
   } catch(e) {
     window._firebaseOk = false;
-    console.warn("Firebase no configurado, modo local");
   }
 
   window._initHistorial = function() {
-    if (!window._firebaseOk) {
-      cargarLocal();
-      return;
-    }
+    if (!window._firebaseOk) { cargarLocal(); return; }
     const histRef = ref(db, 'historial');
     onValue(histRef, (snapshot) => {
       const data = snapshot.val();
-      // Guardar con la key de Firebase para poder borrar
-      historialGlobal = data ? Object.entries(data).map(([k, v]) => ({ ...v, _fbKey: k })) : [];
-      window._historial = historialGlobal;
-      renderHistorial(historialGlobal);
+      const lista = data ? Object.entries(data).map(([k,v]) => ({...v, _fbKey: k})) : [];
+      window._historial = lista;
+      renderHistorial(lista);
     });
   };
 
   window._guardarSemana = async function(semana) {
-    if (!window._firebaseOk) {
-      guardarLocal(semana);
-      return;
-    }
-    const histRef = ref(db, 'historial');
-    const newRef = push(histRef);
+    const newRef = push(ref(db, 'historial'));
     await set(newRef, semana);
   };
 
-  window._borrarSemanaFirebase = async function(fbKey) {
-    const itemRef = ref(db, 'historial/' + fbKey);
-    await remove(itemRef);
+  window._borrarSemana = async function(fbKey) {
+    await remove(ref(db, 'historial/' + fbKey));
+  };
+
+  window._editarSemana = async function(fbKey, semana) {
+    const toSave = {...semana};
+    delete toSave._fbKey;
+    await set(ref(db, 'historial/' + fbKey), toSave);
   };
 </script>
 
@@ -74,350 +61,82 @@
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
   :root {
-    --verde: #1a7a4a;
-    --verde-light: #2ecc71;
-    --verde-pale: #e8f5ee;
-    --verde-mid: #b2dfca;
-    --bg: #f4f9f6;
-    --white: #ffffff;
-    --text: #1a2e22;
-    --text-mid: #4a6b55;
-    --border: #c8e6d4;
-    --shadow: 0 2px 12px rgba(26,122,74,0.10);
-    --radius: 12px;
-    --accent: #ff6b35;
+    --verde: #1a7a4a; --verde-light: #2ecc71; --verde-pale: #e8f5ee;
+    --verde-mid: #b2dfca; --bg: #f4f9f6; --text: #1a2e22;
+    --text-mid: #4a6b55; --border: #c8e6d4;
+    --shadow: 0 2px 12px rgba(26,122,74,0.10); --radius: 12px;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Sora', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  body {
-    font-family: 'Sora', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-
-  header {
-    background: var(--verde);
-    color: white;
-    padding: 18px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  }
-
+  header { background: var(--verde); color: white; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   header h1 { font-size: 1.2rem; font-weight: 700; }
-  header .subtitle { font-size: 0.75rem; opacity: 0.8; }
-
-  .status-dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: #ff4444;
-    display: inline-block;
-    margin-right: 6px;
-  }
-  .status-dot.online { background: var(--verde-light); }
+  .subtitle { font-size: 0.75rem; opacity: 0.8; margin-top: 2px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #ff4444; display: inline-block; margin-right: 5px; vertical-align: middle; }
+  .dot.on { background: var(--verde-light); }
 
   .container { max-width: 700px; margin: 0 auto; padding: 16px; }
 
-  .fecha-row {
-    background: white;
-    border-radius: var(--radius);
-    padding: 14px 16px;
-    margin-bottom: 16px;
-    box-shadow: var(--shadow);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
+  .fecha-row { background: white; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .fecha-row label { font-weight: 600; font-size: 0.9rem; color: var(--verde); }
+  .fecha-row input[type=date] { border: 2px solid var(--border); border-radius: 8px; padding: 8px 12px; font-family: 'Sora', sans-serif; font-size: 0.9rem; color: var(--text); background: var(--verde-pale); outline: none; }
 
-  .fecha-row input[type=date] {
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-family: 'Sora', sans-serif;
-    font-size: 0.9rem;
-    color: var(--text);
-    background: var(--verde-pale);
-    outline: none;
-  }
-
-  .fecha-row input:focus { border-color: var(--verde); }
-
-  .card {
-    background: white;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    margin-bottom: 16px;
-    overflow: hidden;
-  }
-
-  .card-header {
-    background: var(--verde);
-    color: white;
-    padding: 12px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
+  .card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+  .card-header { background: var(--verde); color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
   .card-header h2 { font-size: 1rem; font-weight: 600; }
-
   .card-body { padding: 12px; }
 
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-
-  thead th {
-    background: var(--verde-pale);
-    color: var(--verde);
-    font-weight: 600;
-    padding: 8px 10px;
-    text-align: left;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
+  thead th { background: var(--verde-pale); color: var(--verde); font-weight: 600; padding: 8px 10px; text-align: left; font-size: 0.8rem; text-transform: uppercase; }
   tbody tr { border-bottom: 1px solid var(--border); }
   tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 5px 4px; }
 
-  tbody td { padding: 6px 6px; }
+  input.cell { width: 100%; border: 1px solid transparent; border-radius: 6px; padding: 6px 8px; font-family: 'Sora', sans-serif; font-size: 0.85rem; background: transparent; color: var(--text); outline: none; }
+  input.cell:focus { border-color: var(--verde); background: var(--verde-pale); }
+  input.cell.monto { font-family: 'JetBrains Mono', monospace; text-align: right; font-weight: 600; }
+  input.cell.fijo { font-weight: 700; color: var(--verde); }
 
-  input.cell {
-    width: 100%;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-family: 'Sora', sans-serif;
-    font-size: 0.85rem;
-    background: transparent;
-    color: var(--text);
-    transition: all 0.15s;
-    outline: none;
-  }
+  .btn-add { background: none; border: 2px dashed var(--verde-mid); color: var(--verde); border-radius: 8px; padding: 7px 14px; font-family: 'Sora', sans-serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-top: 8px; width: 100%; }
+  .btn-add:hover { background: var(--verde-pale); }
+  .btn-del { background: none; border: none; color: #e74c3c; font-size: 1rem; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
 
-  input.cell:focus {
-    border-color: var(--verde);
-    background: var(--verde-pale);
-  }
+  .total-row td { background: var(--verde-pale); font-weight: 700; color: var(--verde); padding: 8px 10px; }
+  .total-row .mt { font-family: 'JetBrains Mono', monospace; font-size: 1rem; text-align: right; }
 
-  input.cell.monto {
-    font-family: 'JetBrains Mono', monospace;
-    text-align: right;
-    font-weight: 600;
-  }
+  .total-semanal { background: var(--verde); color: white; border-radius: var(--radius); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(26,122,74,0.25); }
+  .total-semanal .label { font-size: 1rem; font-weight: 600; }
+  .total-semanal .monto { font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; font-weight: 700; }
 
-  input.cell.fixed-name {
-    font-weight: 600;
-    color: var(--verde);
-  }
+  .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .btn { flex: 1; min-width: 130px; padding: 12px 16px; border-radius: 10px; border: none; font-family: 'Sora', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-guardar { background: var(--verde); color: white; box-shadow: 0 4px 12px rgba(26,122,74,0.3); }
+  .btn-excel { background: #217346; color: white; }
+  .btn-limpiar { background: white; color: var(--text-mid); border: 2px solid var(--border); }
 
-  .btn-add {
-    background: none;
-    border: 2px dashed var(--verde-mid);
-    color: var(--verde);
-    border-radius: 8px;
-    padding: 7px 14px;
-    font-family: 'Sora', sans-serif;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 8px;
-    width: 100%;
-    transition: all 0.2s;
-  }
+  .hist-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
+  .hist-header { background: #2c3e50; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .hist-header h2 { font-size: 1rem; }
+  .hist-toggle { transition: transform 0.3s; }
+  .hist-toggle.open { transform: rotate(180deg); }
+  .hist-body { display: none; padding: 12px; }
+  .hist-body.visible { display: block; }
 
-  .btn-add:hover { background: var(--verde-pale); border-color: var(--verde); }
+  .sem-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .sem-header { background: var(--verde-pale); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .sem-header .fl { font-weight: 600; color: var(--verde); font-size: 0.9rem; }
+  .sem-header .badge { background: var(--verde); color: white; border-radius: 20px; padding: 3px 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600; }
+  .sem-det { display: none; padding: 10px 14px; font-size: 0.82rem; }
+  .sem-det.visible { display: block; }
 
-  .btn-del {
-    background: none;
-    border: none;
-    color: #e74c3c;
-    font-size: 1rem;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
-  .btn-del:hover { background: #fdecea; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; display: flex; align-items: flex-start; justify-content: center; padding: 16px; overflow-y: auto; }
+  .modal { background: white; border-radius: 16px; padding: 20px; max-width: 500px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.3); font-family: 'Sora', sans-serif; margin: auto; }
 
-  .total-row td {
-    background: var(--verde-pale);
-    font-weight: 700;
-    color: var(--verde);
-    font-size: 0.9rem;
-    padding: 8px 10px;
-  }
-
-  .total-row .monto-total {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1rem;
-    text-align: right;
-    padding-right: 10px;
-  }
-
-  .total-semanal {
-    background: var(--verde);
-    color: white;
-    border-radius: var(--radius);
-    padding: 16px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 16px rgba(26,122,74,0.25);
-  }
-
-  .total-semanal .label { font-size: 1rem; font-weight: 600; opacity: 0.9; }
-
-  .total-semanal .monto {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.6rem;
-    font-weight: 700;
-  }
-
-  .actions {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-
-  .btn {
-    flex: 1;
-    min-width: 140px;
-    padding: 12px 16px;
-    border-radius: 10px;
-    border: none;
-    font-family: 'Sora', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .btn-guardar {
-    background: var(--verde);
-    color: white;
-    box-shadow: 0 4px 12px rgba(26,122,74,0.3);
-  }
-  .btn-guardar:hover { background: #155e38; transform: translateY(-1px); }
-
-  .btn-excel {
-    background: #217346;
-    color: white;
-    box-shadow: 0 4px 12px rgba(33,115,70,0.3);
-  }
-  .btn-excel:hover { background: #185a36; transform: translateY(-1px); }
-
-  .btn-limpiar {
-    background: white;
-    color: var(--text-mid);
-    border: 2px solid var(--border);
-  }
-  .btn-limpiar:hover { border-color: var(--verde); color: var(--verde); }
-
-  /* Historial */
-  .historial-card {
-    background: white;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-    margin-bottom: 16px;
-  }
-
-  .historial-header {
-    background: #2c3e50;
-    color: white;
-    padding: 12px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .historial-header h2 { font-size: 1rem; }
-  .historial-toggle { font-size: 1.2rem; transition: transform 0.3s; }
-  .historial-toggle.open { transform: rotate(180deg); }
-
-  .historial-body { display: none; padding: 12px; }
-  .historial-body.visible { display: block; }
-
-  .semana-item {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 10px;
-    overflow: hidden;
-  }
-
-  .semana-item-header {
-    background: var(--verde-pale);
-    padding: 10px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-  }
-
-  .semana-item-header .fecha-label { font-weight: 600; color: var(--verde); font-size: 0.9rem; }
-  .semana-item-header .total-badge {
-    background: var(--verde);
-    color: white;
-    border-radius: 20px;
-    padding: 3px 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    font-weight: 600;
-  }
-
-  .semana-detalle { display: none; padding: 10px 14px; font-size: 0.82rem; }
-  .semana-detalle.visible { display: block; }
-
-  .semana-detalle table { font-size: 0.82rem; }
-
-  .toast {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: var(--verde);
-    color: white;
-    padding: 12px 24px;
-    border-radius: 30px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    z-index: 1000;
-  }
-
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--verde); color: white; padding: 12px 24px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; box-shadow: 0 4px 20px rgba(0,0,0,0.2); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); z-index: 9999; }
   .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.error { background: #e74c3c; }
+  .toast.err { background: #e74c3c; }
 
-  /* Firebase setup notice */
-  .firebase-notice {
-    background: #fff3cd;
-    border: 2px solid #ffc107;
-    border-radius: var(--radius);
-    padding: 14px;
-    margin-bottom: 16px;
-    font-size: 0.82rem;
-    line-height: 1.5;
-  }
-  .firebase-notice strong { color: #856404; }
-  .firebase-notice a { color: var(--verde); }
-
-  @media (max-width: 500px) {
-    .actions { flex-direction: column; }
-    .btn { min-width: auto; }
-  }
+  @media(max-width:500px){ .actions{flex-direction:column;} .btn{min-width:auto;} }
 </style>
 </head>
 <body>
@@ -425,644 +144,396 @@
 <header>
   <div>
     <h1>🌿 Dietética Semanal</h1>
-    <div class="subtitle"><span class="status-dot" id="statusDot"></span><span id="statusText">Verificando conexión...</span></div>
+    <div class="subtitle"><span class="dot" id="dot"></span><span id="statusTxt">Conectando...</span></div>
   </div>
 </header>
 
 <div class="container">
 
-  <div class="firebase-notice" id="firebaseNotice">
-    <strong>⚠️ Para acceder desde cualquier dispositivo:</strong> Necesitás configurar Firebase (gratis).<br>
-    1. Entrá a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a><br>
-    2. Creá un proyecto → Realtime Database → Modo test<br>
-    3. Copiá tu configuración y reemplazá los datos en el código HTML (líneas ~20-30)<br>
-    <em>Por ahora los datos se guardan solo en este dispositivo.</em>
-  </div>
-
-  <!-- Fecha -->
   <div class="fecha-row">
     <label>📅 Semana del lunes:</label>
     <input type="date" id="fechaSemana">
   </div>
 
-  <!-- TABLA 1: Devoluciones -->
   <div class="card">
     <div class="card-header">
       <h2>↩️ Devoluciones</h2>
-      <span id="total1Badge" style="font-family:'JetBrains Mono',monospace;font-size:0.9rem;">$0</span>
+      <span id="b1" style="font-family:'JetBrains Mono',monospace;font-size:0.9rem;">$0</span>
     </div>
     <div class="card-body">
       <table>
-        <thead>
-          <tr>
-            <th style="width:30%">Código / Nombre</th>
-            <th style="width:40%">Descripción</th>
-            <th style="width:25%">Importe</th>
-            <th style="width:5%"></th>
-          </tr>
-        </thead>
-        <tbody id="tbody1"></tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td colspan="2"><strong>TOTAL</strong></td>
-            <td class="monto-total" id="total1">$0</td>
-            <td></td>
-          </tr>
-        </tfoot>
+        <thead><tr><th style="width:30%">Código/Nombre</th><th style="width:40%">Descripción</th><th style="width:25%">Importe</th><th style="width:5%"></th></tr></thead>
+        <tbody id="tb1"></tbody>
+        <tfoot><tr class="total-row"><td colspan="2"><strong>TOTAL</strong></td><td class="mt" id="t1">$0</td><td></td></tr></tfoot>
       </table>
       <button class="btn-add" onclick="addRow1()">+ Agregar devolución</button>
     </div>
   </div>
 
-  <!-- TABLA 2: Descuentos -->
   <div class="card">
     <div class="card-header">
       <h2>🏷️ Descuentos</h2>
-      <span id="total2Badge" style="font-family:'JetBrains Mono',monospace;font-size:0.9rem;">$0</span>
+      <span id="b2" style="font-family:'JetBrains Mono',monospace;font-size:0.9rem;">$0</span>
     </div>
     <div class="card-body">
       <table>
-        <thead>
-          <tr>
-            <th style="width:40%">Código / Nombre</th>
-            <th style="width:55%">Importe</th>
-            <th style="width:5%"></th>
-          </tr>
-        </thead>
-        <tbody id="tbody2"></tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td><strong>TOTAL</strong></td>
-            <td class="monto-total" id="total2">$0</td>
-            <td></td>
-          </tr>
-        </tfoot>
+        <thead><tr><th style="width:45%">Código/Nombre</th><th style="width:50%">Importe</th><th style="width:5%"></th></tr></thead>
+        <tbody id="tb2"></tbody>
+        <tfoot><tr class="total-row"><td><strong>TOTAL</strong></td><td class="mt" id="t2">$0</td><td></td></tr></tfoot>
       </table>
-      <button class="btn-add" onclick="addRow2()">+ Agregar cliente extra</button>
+      <button class="btn-add" onclick="addRow2()">+ Agregar descuento extra</button>
     </div>
   </div>
 
-  <!-- Total semanal -->
   <div class="total-semanal">
     <div class="label">💰 TOTAL SEMANAL</div>
-    <div class="monto" id="totalSemanal">$0</div>
+    <div class="monto" id="tSem">$0</div>
   </div>
 
-  <!-- Botones -->
   <div class="actions">
     <button class="btn btn-guardar" onclick="guardarSemana()">💾 Guardar semana</button>
-    <button class="btn btn-excel" onclick="descargarExcel()">📊 Descargar Excel</button>
-    <button class="btn btn-limpiar" onclick="limpiarFormulario()">🗑️ Limpiar</button>
+    <button class="btn btn-excel" onclick="excelTotal()">📊 Excel completo</button>
+    <button class="btn btn-limpiar" onclick="limpiar()">🗑️ Limpiar</button>
   </div>
 
-  <!-- Historial -->
-  <div class="historial-card">
-    <div class="historial-header" onclick="toggleHistorial()">
+  <div class="hist-card">
+    <div class="hist-header" onclick="toggleHist()">
       <h2>📋 Historial de semanas</h2>
-      <span class="historial-toggle" id="histToggle">▼</span>
+      <span class="hist-toggle" id="histTog">▼</span>
     </div>
-    <div class="historial-body" id="historialBody">
-      <div id="historialContent" style="color:#888;font-size:0.85rem;text-align:center;padding:20px;">
-        Cargando historial...
-      </div>
+    <div class="hist-body" id="histBody">
+      <div id="histCont" style="color:#888;font-size:0.85rem;text-align:center;padding:20px;">Cargando...</div>
     </div>
   </div>
 
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-// ========== ESTADO ==========
-let rows1 = []; // [{id, codigo, descripcion, importe}]
-let rows2 = []; // [{id, codigo, importe, fixed}]
+let rows1 = [], rows2 = [];
+const FIXED = ['s61ma','s5mi','s23ju'];
 
-const FIXED_CLIENTES = ['s61ma', 's5mi', 's23ju'];
-
-// ========== INIT ==========
 window.addEventListener('load', () => {
-  setMondayDate();
-  initRows1();
-  initRows2();
+  setLunes();
+  initR1(); initR2();
   setTimeout(() => {
-    if (window._initHistorial) {
-      window._initHistorial();
-    } else {
-      cargarLocal();
-    }
-    updateStatus();
-  }, 1000);
+    if (window._initHistorial) window._initHistorial();
+    else cargarLocal();
+    // estado conexión
+    const d = document.getElementById('dot');
+    const t = document.getElementById('statusTxt');
+    if (window._firebaseOk) { d.className='dot on'; t.textContent='Sincronizado en la nube ☁️'; }
+    else { d.className='dot'; t.textContent='Solo local'; }
+  }, 900);
 });
 
-function setMondayDate() {
-  const today = new Date();
-  const day = today.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  document.getElementById('fechaSemana').value = monday.toISOString().split('T')[0];
+function setLunes() {
+  const hoy = new Date();
+  const diff = hoy.getDay()===0 ? -6 : 1-hoy.getDay();
+  const lun = new Date(hoy); lun.setDate(hoy.getDate()+diff);
+  document.getElementById('fechaSemana').value = lun.toISOString().split('T')[0];
 }
 
-function updateStatus() {
-  const dot = document.getElementById('statusDot');
-  const txt = document.getElementById('statusText');
-  if (window._firebaseOk) {
-    dot.className = 'status-dot online';
-    txt.textContent = 'Sincronizado en la nube';
-    document.getElementById('firebaseNotice').style.display = 'none';
-  } else {
-    dot.className = 'status-dot';
-    txt.textContent = 'Solo local (sin nube)';
-  }
-}
-
-// ========== TABLA 1 ==========
-function initRows1() {
-  rows1 = [{ id: Date.now(), codigo: '', descripcion: 'galletas rotas', importe: '' }];
-  renderTable1();
-}
-
-function addRow1() {
-  rows1.push({ id: Date.now(), codigo: '', descripcion: 'galletas rotas', importe: '' });
-  renderTable1();
-}
-
-function removeRow1(id) {
-  rows1 = rows1.filter(r => r.id !== id);
-  renderTable1();
+// ---- TABLA 1 ----
+function initR1() { rows1=[{id:Date.now(),codigo:'',desc:'galletas rotas',imp:''}]; renderT1(); }
+function addRow1() { rows1.push({id:Date.now(),codigo:'',desc:'galletas rotas',imp:''}); renderT1(); }
+function delR1(id) { rows1=rows1.filter(r=>r.id!==id); renderT1(); }
+function updR1(id,f,v) { const r=rows1.find(r=>r.id===id); if(r){r[f]=v;recalc();} }
+function renderT1() {
+  document.getElementById('tb1').innerHTML = rows1.map(r=>`
+    <tr>
+      <td><input class="cell" value="${esc(r.codigo)}" oninput="updR1(${r.id},'codigo',this.value)" placeholder="Código/Nombre"></td>
+      <td><input class="cell" value="${esc(r.desc)}" oninput="updR1(${r.id},'desc',this.value)" placeholder="galletas rotas"></td>
+      <td><input class="cell monto" type="number" value="${r.imp}" oninput="updR1(${r.id},'imp',this.value)" placeholder="0"></td>
+      <td><button class="btn-del" onclick="delR1(${r.id})">✕</button></td>
+    </tr>`).join('');
   recalc();
 }
 
-function renderTable1() {
-  const tbody = document.getElementById('tbody1');
-  tbody.innerHTML = '';
-  rows1.forEach(row => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input class="cell" placeholder="Código/Nombre" value="${row.codigo}" oninput="updateRow1(${row.id},'codigo',this.value)"></td>
-      <td><input class="cell" placeholder="galletas rotas" value="${row.descripcion}" oninput="updateRow1(${row.id},'descripcion',this.value)"></td>
-      <td><input class="cell monto" placeholder="0" value="${row.importe}" oninput="updateRow1(${row.id},'importe',this.value)" type="number"></td>
-      <td><button class="btn-del" onclick="removeRow1(${row.id})">✕</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
+// ---- TABLA 2 ----
+function initR2() { rows2=FIXED.map(c=>({id:c,codigo:c,imp:'',fixed:true})); renderT2(); }
+function addRow2() { rows2.push({id:'x'+Date.now(),codigo:'',imp:'',fixed:false}); renderT2(); }
+function delR2(id) { const r=rows2.find(r=>r.id===id); if(r&&r.fixed){toast('No se puede eliminar un cliente fijo',1);return;} rows2=rows2.filter(r=>r.id!==id); renderT2(); }
+function updR2(id,f,v) { const r=rows2.find(r=>r.id===id); if(r){r[f]=v;recalc();} }
+function renderT2() {
+  document.getElementById('tb2').innerHTML = rows2.map(r=>`
+    <tr>
+      <td>${r.fixed
+        ? `<input class="cell fijo" value="${esc(r.codigo)}" readonly>`
+        : `<input class="cell" value="${esc(r.codigo)}" oninput="updR2('${r.id}','codigo',this.value)" placeholder="Código/Nombre">`}
+      </td>
+      <td><input class="cell monto" type="number" value="${r.imp}" oninput="updR2('${r.id}','imp',this.value)" placeholder="0"></td>
+      <td>${r.fixed?'':'<button class="btn-del" onclick="delR2(\''+r.id+'\')">✕</button>'}</td>
+    </tr>`).join('');
   recalc();
 }
 
-function updateRow1(id, field, value) {
-  const r = rows1.find(r => r.id === id);
-  if (r) r[field] = value;
-  recalc();
-}
-
-// ========== TABLA 2 ==========
-function initRows2() {
-  rows2 = FIXED_CLIENTES.map(c => ({ id: c, codigo: c, importe: '', fixed: true }));
-  renderTable2();
-}
-
-function addRow2() {
-  rows2.push({ id: 'extra_' + Date.now(), codigo: '', importe: '', fixed: false });
-  renderTable2();
-}
-
-function removeRow2(id) {
-  const r = rows2.find(r => r.id === id);
-  if (r && r.fixed) { showToast('No se puede eliminar un cliente fijo', true); return; }
-  rows2 = rows2.filter(r => r.id !== id);
-  renderTable2();
-  recalc();
-}
-
-function renderTable2() {
-  const tbody = document.getElementById('tbody2');
-  tbody.innerHTML = '';
-  rows2.forEach(row => {
-    const tr = document.createElement('tr');
-    const nameInput = row.fixed
-      ? `<input class="cell fixed-name" value="${row.codigo}" readonly style="color:var(--verde);font-weight:700;">`
-      : `<input class="cell" placeholder="Código/Nombre" value="${row.codigo}" oninput="updateRow2('${row.id}','codigo',this.value)">`;
-    tr.innerHTML = `
-      <td>${nameInput}</td>
-      <td><input class="cell monto" placeholder="0" value="${row.importe}" oninput="updateRow2('${row.id}','importe',this.value)" type="number"></td>
-      <td>${row.fixed ? '' : `<button class="btn-del" onclick="removeRow2('${row.id}')">✕</button>`}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-  recalc();
-}
-
-function updateRow2(id, field, value) {
-  const r = rows2.find(r => r.id === id);
-  if (r) r[field] = value;
-  recalc();
-}
-
-// ========== CALCULOS ==========
+// ---- CALCULOS ----
 function recalc() {
-  const t1 = rows1.reduce((s, r) => s + (parseFloat(r.importe) || 0), 0);
-  const t2 = rows2.reduce((s, r) => s + (parseFloat(r.importe) || 0), 0);
-  const total = t1 + t2;
-
-  document.getElementById('total1').textContent = formatMoney(t1);
-  document.getElementById('total1Badge').textContent = formatMoney(t1);
-  document.getElementById('total2').textContent = formatMoney(t2);
-  document.getElementById('total2Badge').textContent = formatMoney(t2);
-  document.getElementById('totalSemanal').textContent = formatMoney(total);
+  const v1 = rows1.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
+  const v2 = rows2.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
+  document.getElementById('t1').textContent=fmt(v1);
+  document.getElementById('b1').textContent=fmt(v1);
+  document.getElementById('t2').textContent=fmt(v2);
+  document.getElementById('b2').textContent=fmt(v2);
+  document.getElementById('tSem').textContent=fmt(v1+v2);
 }
 
-function formatMoney(n) {
-  return '$' + n.toLocaleString('es-AR');
-}
+function fmt(n) { return '$'+(parseFloat(n)||0).toLocaleString('es-AR'); }
+function fFecha(f) { if(!f)return'-'; const[y,m,d]=f.split('-'); return`${d}/${m}/${y}`; }
+function esc(s) { return (s||'').replace(/"/g,'&quot;'); }
 
-// ========== GUARDAR ==========
+// ---- GUARDAR ----
 function guardarSemana() {
   const fecha = document.getElementById('fechaSemana').value;
-  if (!fecha) { showToast('Seleccioná la fecha primero', true); return; }
-
-  const t1 = rows1.reduce((s, r) => s + (parseFloat(r.importe) || 0), 0);
-  const t2 = rows2.reduce((s, r) => s + (parseFloat(r.importe) || 0), 0);
-
-  const semana = {
+  if (!fecha) { toast('Seleccioná la fecha primero',1); return; }
+  const t1=rows1.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
+  const t2=rows2.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
+  const sem = {
     fecha,
-    dieteticas: rows1.map(r => ({ codigo: r.codigo, descripcion: r.descripcion, importe: parseFloat(r.importe) || 0 })),
-    clientes: rows2.map(r => ({ codigo: r.codigo, importe: parseFloat(r.importe) || 0 })),
-    total1: t1,
-    total2: t2,
-    totalSemanal: t1 + t2,
+    dieteticas: rows1.map(r=>({codigo:r.codigo,descripcion:r.desc,importe:parseFloat(r.imp)||0})),
+    clientes: rows2.map(r=>({codigo:r.codigo,importe:parseFloat(r.imp)||0,fixed:r.fixed||false})),
+    total1:t1, total2:t2, totalSemanal:t1+t2,
     guardadoEn: new Date().toISOString()
   };
-
   if (window._firebaseOk && window._guardarSemana) {
-    window._guardarSemana(semana).then(() => showToast('✅ Semana guardada en la nube')).catch(() => showToast('Error al guardar', true));
+    window._guardarSemana(sem).then(()=>toast('✅ Guardado en la nube')).catch(()=>toast('Error al guardar',1));
   } else {
-    guardarLocal(semana);
-    showToast('✅ Semana guardada');
+    guardarLocal(sem); toast('✅ Semana guardada');
   }
 }
 
-function guardarLocal(semana) {
-  const hist = JSON.parse(localStorage.getItem('historial_dietetica') || '[]');
-  hist.unshift(semana);
-  localStorage.setItem('historial_dietetica', JSON.stringify(hist));
-  renderHistorial(hist);
+function guardarLocal(s) {
+  const h=JSON.parse(localStorage.getItem('hd')||'[]'); h.unshift(s);
+  localStorage.setItem('hd',JSON.stringify(h)); window._historial=h; renderHistorial(h);
 }
-
 function cargarLocal() {
-  const hist = JSON.parse(localStorage.getItem('historial_dietetica') || '[]');
-  window._historial = hist;
-  renderHistorial(hist);
+  const h=JSON.parse(localStorage.getItem('hd')||'[]'); window._historial=h; renderHistorial(h);
 }
 
-// ========== HISTORIAL ==========
-function toggleHistorial() {
-  const body = document.getElementById('historialBody');
-  const icon = document.getElementById('histToggle');
-  body.classList.toggle('visible');
-  icon.classList.toggle('open');
+// ---- HISTORIAL ----
+function toggleHist() {
+  document.getElementById('histBody').classList.toggle('visible');
+  document.getElementById('histTog').classList.toggle('open');
 }
+function getSorted() { return [...(window._historial||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha)); }
 
 function renderHistorial(lista) {
-  const cont = document.getElementById('historialContent');
-  if (!lista || lista.length === 0) {
-    cont.innerHTML = '<p style="color:#888;text-align:center;padding:20px;font-size:0.85rem;">No hay semanas guardadas aún.</p>';
-    return;
-  }
-
-  const sorted = [...lista].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  // Guardar referencia global con key para acceder desde botones
-  window._sortedHist = sorted;
-
-  cont.innerHTML = sorted.map((s, i) => {
-    const key = s._fbKey || s.guardadoEn || i;
-    return `
-    <div class="semana-item">
-      <div class="semana-item-header" onclick="toggleDetalle('det_${i}')">
-        <span class="fecha-label">📅 ${formatFecha(s.fecha)}</span>
-        <span class="total-badge">${formatMoney(s.totalSemanal || 0)}</span>
+  const cont = document.getElementById('histCont');
+  if (!lista||lista.length===0) { cont.innerHTML='<p style="color:#888;text-align:center;padding:20px;">No hay semanas guardadas aún.</p>'; return; }
+  const sorted = [...lista].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  cont.innerHTML = sorted.map((s,i)=>`
+    <div class="sem-item">
+      <div class="sem-header" onclick="togDet('d${i}')">
+        <span class="fl">📅 ${fFecha(s.fecha)}</span>
+        <span class="badge">${fmt(s.totalSemanal||0)}</span>
       </div>
-      <div class="semana-detalle" id="det_${i}">
+      <div class="sem-det" id="d${i}">
         <strong style="color:var(--verde);font-size:0.8rem;">↩️ DEVOLUCIONES</strong>
         <table style="margin:6px 0 10px;">
           <thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right">Importe</th></tr></thead>
-          <tbody>
-            ${(s.dieteticas||[]).map(d => `<tr><td>${d.codigo||'-'}</td><td>${d.descripcion||'-'}</td><td style="text-align:right;font-family:monospace">${formatMoney(d.importe)}</td></tr>`).join('')}
-          </tbody>
-          <tfoot><tr><td colspan="2" style="font-weight:700">Total</td><td style="text-align:right;font-weight:700;font-family:monospace">${formatMoney(s.total1)}</td></tr></tfoot>
+          <tbody>${(s.dieteticas||[]).map(d=>`<tr><td>${d.codigo||'-'}</td><td>${d.descripcion||'-'}</td><td style="text-align:right;font-family:monospace">${fmt(d.importe)}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td colspan="2" style="font-weight:700">Total</td><td style="text-align:right;font-weight:700;font-family:monospace">${fmt(s.total1)}</td></tr></tfoot>
         </table>
         <strong style="color:var(--verde);font-size:0.8rem;">🏷️ DESCUENTOS</strong>
         <table style="margin:6px 0;">
           <thead><tr><th>Código</th><th style="text-align:right">Importe</th></tr></thead>
-          <tbody>
-            ${(s.clientes||[]).map(c => `<tr><td>${c.codigo||'-'}</td><td style="text-align:right;font-family:monospace">${formatMoney(c.importe)}</td></tr>`).join('')}
-          </tbody>
-          <tfoot><tr><td style="font-weight:700">Total</td><td style="text-align:right;font-weight:700;font-family:monospace">${formatMoney(s.total2)}</td></tr></tfoot>
+          <tbody>${(s.clientes||[]).map(c=>`<tr><td>${c.codigo||'-'}</td><td style="text-align:right;font-family:monospace">${fmt(c.importe)}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td style="font-weight:700">Total</td><td style="text-align:right;font-weight:700;font-family:monospace">${fmt(s.total2)}</td></tr></tfoot>
         </table>
         <div style="background:var(--verde);color:white;border-radius:6px;padding:6px 12px;display:flex;justify-content:space-between;margin-top:6px;">
-          <strong>TOTAL SEMANAL</strong>
-          <strong style="font-family:monospace">${formatMoney(s.totalSemanal)}</strong>
+          <strong>TOTAL SEMANAL</strong><strong style="font-family:monospace">${fmt(s.totalSemanal)}</strong>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-          <button onclick="exportarSemanaSola(${i})" style="flex:1;min-width:80px;background:#217346;color:white;border:none;border-radius:6px;padding:8px 10px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">📊 Excel</button>
-          <button onclick="abrirEditar(${i})" style="flex:1;min-width:80px;background:#2980b9;color:white;border:none;border-radius:6px;padding:8px 10px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">✏️ Editar</button>
-          <button onclick="confirmarBorrar(${i})" style="flex:1;min-width:80px;background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px 10px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">🗑️ Borrar</button>
+          <button onclick="excelSemana(${i})" style="flex:1;min-width:70px;background:#217346;color:white;border:none;border-radius:6px;padding:8px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">📊 Excel</button>
+          <button onclick="abrirEditar(${i})" style="flex:1;min-width:70px;background:#2980b9;color:white;border:none;border-radius:6px;padding:8px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">✏️ Editar</button>
+          <button onclick="confirmarBorrar(${i})" style="flex:1;min-width:70px;background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">🗑️ Borrar</button>
         </div>
       </div>
-    </div>
-  `}).join('');
+    </div>`).join('');
 }
 
-function toggleDetalle(id) {
-  document.getElementById(id).classList.toggle('visible');
-}
+function togDet(id) { document.getElementById(id).classList.toggle('visible'); }
 
-function formatFecha(f) {
-  if (!f) return '-';
-  const [y,m,d] = f.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-// ========== EXCEL ==========
-function descargarExcel() {
-  const hist = window._historial || JSON.parse(localStorage.getItem('historial_dietetica') || '[]');
+// ---- EXCEL ----
+function excelTotal() {
+  const hist = window._historial||[];
+  if (!hist.length) { toast('No hay semanas guardadas',1); return; }
+  const sorted = [...hist].sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const wb = XLSX.utils.book_new();
-
-  // Hoja resumen
-  const resumenData = [['Fecha', 'Total Dietéticas', 'Total Clientes', 'Total Semanal']];
-  const sorted = [...hist].sort((a,b) => a.fecha.localeCompare(b.fecha));
-  sorted.forEach(s => {
-    resumenData.push([formatFecha(s.fecha), s.total1 || 0, s.total2 || 0, s.totalSemanal || 0]);
-  });
-  const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
-  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
-
-  // Hoja detalle dietéticas
-  const det1 = [['Semana', 'Código', 'Descripción', 'Importe']];
-  sorted.forEach(s => {
-    (s.dieteticas||[]).forEach(d => det1.push([formatFecha(s.fecha), d.codigo, d.descripcion, d.importe]));
-    det1.push([formatFecha(s.fecha), '', 'SUBTOTAL', s.total1]);
-    det1.push([]);
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det1), 'Dietéticas');
-
-  // Hoja detalle clientes
-  const det2 = [['Semana', 'Código/Nombre', 'Importe']];
-  sorted.forEach(s => {
-    (s.clientes||[]).forEach(c => det2.push([formatFecha(s.fecha), c.codigo, c.importe]));
-    det2.push([formatFecha(s.fecha), 'SUBTOTAL', s.total2]);
-    det2.push([]);
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det2), 'Clientes');
-
-  XLSX.writeFile(wb, `dietetica_${new Date().toISOString().split('T')[0]}.xlsx`);
-  showToast('📊 Excel descargado');
+  const r=[['Fecha','Total Devoluciones','Total Descuentos','Total Semanal']];
+  sorted.forEach(s=>r.push([fFecha(s.fecha),s.total1||0,s.total2||0,s.totalSemanal||0]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r),'Resumen');
+  const d1=[['Semana','Código','Descripción','Importe']];
+  sorted.forEach(s=>{(s.dieteticas||[]).forEach(d=>d1.push([fFecha(s.fecha),d.codigo,d.descripcion,d.importe]));d1.push([fFecha(s.fecha),'','SUBTOTAL',s.total1]);d1.push([]);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d1),'Devoluciones');
+  const d2=[['Semana','Código','Importe']];
+  sorted.forEach(s=>{(s.clientes||[]).forEach(c=>d2.push([fFecha(s.fecha),c.codigo,c.importe]));d2.push([fFecha(s.fecha),'SUBTOTAL',s.total2]);d2.push([]);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d2),'Descuentos');
+  XLSX.writeFile(wb,`dietetica_${new Date().toISOString().split('T')[0]}.xlsx`);
+  toast('📊 Excel descargado');
 }
 
-function exportarSemanaSola(idx) {
-  const sorted = window._sortedHist;
-  if (!sorted || !sorted[idx]) { showToast('Error al exportar', true); return; }
+function excelSemana(idx) {
+  const sorted = getSorted();
   const s = sorted[idx];
-
+  if (!s) { toast('Error al exportar',1); return; }
   const wb = XLSX.utils.book_new();
   const data = [
-    [`Semana del: ${formatFecha(s.fecha)}`],
-    [],
-    ['DEVOLUCIONES'],
-    ['Código', 'Descripción', 'Importe'],
-    ...(s.dieteticas||[]).map(d => [d.codigo, d.descripcion, d.importe]),
-    ['', 'TOTAL DEVOLUCIONES', s.total1],
-    [],
-    ['DESCUENTOS'],
-    ['Código/Nombre', 'Importe'],
-    ...(s.clientes||[]).map(c => [c.codigo, c.importe]),
-    ['', 'TOTAL DESCUENTOS', s.total2],
-    [],
-    ['TOTAL SEMANAL', '', s.totalSemanal]
+    [`Semana del: ${fFecha(s.fecha)}`],[],
+    ['DEVOLUCIONES'],['Código','Descripción','Importe'],
+    ...(s.dieteticas||[]).map(d=>[d.codigo,d.descripcion,d.importe]),
+    ['','TOTAL DEVOLUCIONES',s.total1],[],
+    ['DESCUENTOS'],['Código','Importe'],
+    ...(s.clientes||[]).map(c=>[c.codigo,c.importe]),
+    ['TOTAL DESCUENTOS',s.total2],[],
+    ['TOTAL SEMANAL','',s.totalSemanal]
   ];
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  XLSX.utils.book_append_sheet(wb, ws, 'Semana ' + formatFecha(s.fecha));
-  XLSX.writeFile(wb, `semana_${s.fecha}.xlsx`);
-  showToast('📊 Excel descargado');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),'Semana');
+  XLSX.writeFile(wb,`semana_${s.fecha}.xlsx`);
+  toast('📊 Excel descargado');
 }
 
-// ========== EDITAR SEMANA ==========
+// ---- EDITAR ----
 function abrirEditar(idx) {
-  const sorted = window._sortedHist;
-  if (!sorted || !sorted[idx]) return;
-  const s = JSON.parse(JSON.stringify(sorted[idx])); // copia profunda
+  const s = getSorted()[idx];
+  if (!s) return;
+  window.eT = JSON.parse(JSON.stringify(s)); // editTemp
 
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
-
-  const buildRows1 = (items) => (items||[]).map((d,i) => `
-    <tr id="edit1_row_${i}">
-      <td><input class="cell" value="${d.codigo||''}" oninput="editTemp.dieteticas[${i}].codigo=this.value" placeholder="Código"></td>
-      <td><input class="cell" value="${d.descripcion||''}" oninput="editTemp.dieteticas[${i}].descripcion=this.value" placeholder="Descripción"></td>
-      <td><input class="cell monto" type="number" value="${d.importe||''}" oninput="editTemp.dieteticas[${i}].importe=parseFloat(this.value)||0;recalcEdit()" placeholder="0"></td>
-      <td><button class="btn-del" onclick="eliminarFilaEdit(1,${i})">✕</button></td>
-    </tr>`).join('');
-
-  const buildRows2 = (items) => (items||[]).map((c,i) => `
-    <tr id="edit2_row_${i}">
-      <td><input class="cell ${c.fixed?'fixed-name':''}" value="${c.codigo||''}" ${c.fixed?'readonly':''} oninput="editTemp.clientes[${i}].codigo=this.value" placeholder="Código"></td>
-      <td><input class="cell monto" type="number" value="${c.importe||''}" oninput="editTemp.clientes[${i}].importe=parseFloat(this.value)||0;recalcEdit()" placeholder="0"></td>
-      <td>${c.fixed?'':'<button class="btn-del" onclick="eliminarFilaEdit(2,'+i+')">✕</button>'}</td>
-    </tr>`).join('');
-
-  window.editTemp = JSON.parse(JSON.stringify(s));
-
-  overlay.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:20px;max-width:500px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.3);font-family:'Sora',sans-serif;margin:auto;">
+  const ov = document.createElement('div');
+  ov.className='overlay'; ov.id='ovEdit';
+  ov.innerHTML=`
+    <div class="modal">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <h3 style="color:var(--verde);font-size:1rem;">✏️ Editar semana del ${formatFecha(s.fecha)}</h3>
-        <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#888;">✕</button>
+        <h3 style="color:var(--verde);font-size:1rem;">✏️ Editar — ${fFecha(s.fecha)}</h3>
+        <button onclick="cerrar('ovEdit')" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;">✕</button>
       </div>
-
       <strong style="color:var(--verde);font-size:0.8rem;">↩️ DEVOLUCIONES</strong>
-      <table style="width:100%;margin:6px 0 4px;" id="editTable1">
-        <thead><tr><th style="width:28%">Código</th><th style="width:42%">Descripción</th><th style="width:25%">Importe</th><th style="width:5%"></th></tr></thead>
-        <tbody id="editTbody1">${buildRows1(s.dieteticas)}</tbody>
+      <table style="width:100%;margin:6px 0 4px;">
+        <thead><tr><th style="width:28%">Código</th><th style="width:40%">Descripción</th><th style="width:27%">Importe</th><th></th></tr></thead>
+        <tbody id="et1">${eRows1()}</tbody>
       </table>
-      <button class="btn-add" onclick="agregarFilaEdit(1)" style="margin-bottom:12px;">+ Agregar devolución</button>
-
+      <button class="btn-add" onclick="eAdd1()" style="margin-bottom:12px;">+ Agregar</button>
       <strong style="color:var(--verde);font-size:0.8rem;">🏷️ DESCUENTOS</strong>
-      <table style="width:100%;margin:6px 0 4px;" id="editTable2">
-        <thead><tr><th style="width:45%">Código</th><th style="width:50%">Importe</th><th style="width:5%"></th></tr></thead>
-        <tbody id="editTbody2">${buildRows2(s.clientes)}</tbody>
+      <table style="width:100%;margin:6px 0 4px;">
+        <thead><tr><th style="width:45%">Código</th><th style="width:50%">Importe</th><th></th></tr></thead>
+        <tbody id="et2">${eRows2()}</tbody>
       </table>
-      <button class="btn-add" onclick="agregarFilaEdit(2)" style="margin-bottom:12px;">+ Agregar descuento</button>
-
+      <button class="btn-add" onclick="eAdd2()" style="margin-bottom:12px;">+ Agregar</button>
       <div style="background:var(--verde);color:white;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;margin-bottom:14px;">
         <strong>TOTAL SEMANAL</strong>
-        <strong id="editTotal" style="font-family:monospace;">${formatMoney((s.total1||0)+(s.total2||0))}</strong>
+        <strong id="eTot" style="font-family:monospace;">${fmt((s.total1||0)+(s.total2||0))}</strong>
       </div>
-
       <div style="display:flex;gap:10px;">
-        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:11px;border:2px solid var(--border);background:white;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:var(--text-mid);">Cancelar</button>
-        <button onclick="guardarEdicion('${s._fbKey||''}','${s.guardadoEn||''}')" style="flex:1;padding:11px;background:var(--verde);border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:white;">💾 Guardar cambios</button>
+        <button onclick="cerrar('ovEdit')" style="flex:1;padding:11px;border:2px solid var(--border);background:white;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:var(--text-mid);">Cancelar</button>
+        <button onclick="guardarEdit()" style="flex:1;padding:11px;background:var(--verde);border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:white;">💾 Guardar</button>
       </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
+    </div>`;
+  document.body.appendChild(ov);
 }
 
-function recalcEdit() {
-  const t1 = (window.editTemp.dieteticas||[]).reduce((s,r) => s+(parseFloat(r.importe)||0), 0);
-  const t2 = (window.editTemp.clientes||[]).reduce((s,r) => s+(parseFloat(r.importe)||0), 0);
-  const el = document.getElementById('editTotal');
-  if (el) el.textContent = formatMoney(t1+t2);
+function eRows1() {
+  return (window.eT.dieteticas||[]).map((d,i)=>`
+    <tr>
+      <td><input class="cell" value="${esc(d.codigo||'')}" oninput="eT.dieteticas[${i}].codigo=this.value" placeholder="Código"></td>
+      <td><input class="cell" value="${esc(d.descripcion||'')}" oninput="eT.dieteticas[${i}].descripcion=this.value" placeholder="Descripción"></td>
+      <td><input class="cell monto" type="number" value="${d.importe||''}" oninput="eT.dieteticas[${i}].importe=parseFloat(this.value)||0;eRecalc()" placeholder="0"></td>
+      <td><button class="btn-del" onclick="eDel1(${i})">✕</button></td>
+    </tr>`).join('');
 }
 
-function eliminarFilaEdit(tabla, idx) {
-  if (tabla === 1) {
-    window.editTemp.dieteticas.splice(idx, 1);
-    document.getElementById('editTbody1').innerHTML = window.editTemp.dieteticas.map((d,i) => `
-      <tr><td><input class="cell" value="${d.codigo||''}" oninput="editTemp.dieteticas[${i}].codigo=this.value" placeholder="Código"></td>
-      <td><input class="cell" value="${d.descripcion||''}" oninput="editTemp.dieteticas[${i}].descripcion=this.value" placeholder="Descripción"></td>
-      <td><input class="cell monto" type="number" value="${d.importe||''}" oninput="editTemp.dieteticas[${i}].importe=parseFloat(this.value)||0;recalcEdit()" placeholder="0"></td>
-      <td><button class="btn-del" onclick="eliminarFilaEdit(1,${i})">✕</button></td></tr>`).join('');
-  } else {
-    const r = window.editTemp.clientes[idx];
-    if (r && r.fixed) { showToast('No se puede eliminar un cliente fijo', true); return; }
-    window.editTemp.clientes.splice(idx, 1);
-    document.getElementById('editTbody2').innerHTML = window.editTemp.clientes.map((c,i) => `
-      <tr><td><input class="cell ${c.fixed?'fixed-name':''}" value="${c.codigo||''}" ${c.fixed?'readonly':''} oninput="editTemp.clientes[${i}].codigo=this.value" placeholder="Código"></td>
-      <td><input class="cell monto" type="number" value="${c.importe||''}" oninput="editTemp.clientes[${i}].importe=parseFloat(this.value)||0;recalcEdit()" placeholder="0"></td>
-      <td>${c.fixed?'':'<button class="btn-del" onclick="eliminarFilaEdit(2,'+i+')">✕</button>'}</td></tr>`).join('');
-  }
-  recalcEdit();
+function eRows2() {
+  return (window.eT.clientes||[]).map((c,i)=>`
+    <tr>
+      <td>${c.fixed
+        ? `<input class="cell fijo" value="${esc(c.codigo||'')}" readonly>`
+        : `<input class="cell" value="${esc(c.codigo||'')}" oninput="eT.clientes[${i}].codigo=this.value" placeholder="Código">`}
+      </td>
+      <td><input class="cell monto" type="number" value="${c.importe||''}" oninput="eT.clientes[${i}].importe=parseFloat(this.value)||0;eRecalc()" placeholder="0"></td>
+      <td>${c.fixed?'':'<button class="btn-del" onclick="eDel2('+i+')">✕</button>'}</td>
+    </tr>`).join('');
 }
 
-function agregarFilaEdit(tabla) {
-  if (tabla === 1) {
-    window.editTemp.dieteticas.push({ codigo:'', descripcion:'galletas rotas', importe:0 });
-    const i = window.editTemp.dieteticas.length - 1;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td><input class="cell" value="" oninput="editTemp.dieteticas[${i}].codigo=this.value" placeholder="Código"></td>
-      <td><input class="cell" value="galletas rotas" oninput="editTemp.dieteticas[${i}].descripcion=this.value" placeholder="Descripción"></td>
-      <td><input class="cell monto" type="number" value="" oninput="editTemp.dieteticas[${i}].importe=parseFloat(this.value)||0;recalcEdit()" placeholder="0"></td>
-      <td><button class="btn-del" onclick="eliminarFilaEdit(1,${i})">✕</button></td>`;
-    document.getElementById('editTbody1').appendChild(tr);
-  } else {
-    window.editTemp.clientes.push({ codigo:'', importe:0, fixed:false });
-    const i = window.editTemp.clientes.length - 1;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td><input class="cell" value="" oninput="editTemp.clientes[${i}].codigo=this.value" placeholder="Código"></td>
-      <td><input class="cell monto" type="number" value="" oninput="editTemp.clientes[${i}].importe=parseFloat(this.value)||0;recalcEdit()" placeholder="0"></td>
-      <td><button class="btn-del" onclick="eliminarFilaEdit(2,${i})">✕</button></td>`;
-    document.getElementById('editTbody2').appendChild(tr);
-  }
+function eRecalc() {
+  const t1=(window.eT.dieteticas||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
+  const t2=(window.eT.clientes||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
+  const el=document.getElementById('eTot'); if(el) el.textContent=fmt(t1+t2);
 }
 
-async function guardarEdicion(fbKey, guardadoEn) {
-  const t1 = (window.editTemp.dieteticas||[]).reduce((s,r) => s+(parseFloat(r.importe)||0), 0);
-  const t2 = (window.editTemp.clientes||[]).reduce((s,r) => s+(parseFloat(r.importe)||0), 0);
-  window.editTemp.total1 = t1;
-  window.editTemp.total2 = t2;
-  window.editTemp.totalSemanal = t1 + t2;
+function eDel1(i) { window.eT.dieteticas.splice(i,1); document.getElementById('et1').innerHTML=eRows1(); eRecalc(); }
+function eDel2(i) {
+  if(window.eT.clientes[i]?.fixed){toast('No se puede eliminar un cliente fijo',1);return;}
+  window.eT.clientes.splice(i,1); document.getElementById('et2').innerHTML=eRows2(); eRecalc();
+}
+function eAdd1() { window.eT.dieteticas.push({codigo:'',descripcion:'galletas rotas',importe:0}); document.getElementById('et1').innerHTML=eRows1(); }
+function eAdd2() { window.eT.clientes.push({codigo:'',importe:0,fixed:false}); document.getElementById('et2').innerHTML=eRows2(); }
 
-  if (window._firebaseOk && fbKey && window._db && window._dbRef && window._dbSet) {
+async function guardarEdit() {
+  const t1=(window.eT.dieteticas||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
+  const t2=(window.eT.clientes||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
+  window.eT.total1=t1; window.eT.total2=t2; window.eT.totalSemanal=t1+t2;
+
+  if (window._firebaseOk && window.eT._fbKey && window._editarSemana) {
     try {
-      const itemRef = window._dbRef(window._db, 'historial/' + fbKey);
-      const toSave = {...window.editTemp};
-      delete toSave._fbKey;
-      await window._dbSet(itemRef, toSave);
-      showToast('✅ Cambios guardados en la nube');
-    } catch(e) {
-      showToast('Error al guardar', true); return;
-    }
+      await window._editarSemana(window.eT._fbKey, window.eT);
+      cerrar('ovEdit'); toast('✅ Cambios guardados');
+    } catch(e) { toast('Error al guardar',1); }
   } else {
-    // Local
-    let hist = JSON.parse(localStorage.getItem('historial_dietetica') || '[]');
-    const idx = hist.findIndex(h => h.guardadoEn === guardadoEn);
-    if (idx >= 0) hist[idx] = window.editTemp;
-    localStorage.setItem('historial_dietetica', JSON.stringify(hist));
-    window._historial = hist;
-    renderHistorial(hist);
-    showToast('✅ Cambios guardados');
+    let h=JSON.parse(localStorage.getItem('hd')||'[]');
+    const i=h.findIndex(x=>x.guardadoEn===window.eT.guardadoEn);
+    if(i>=0) h[i]=window.eT; else h.unshift(window.eT);
+    localStorage.setItem('hd',JSON.stringify(h));
+    window._historial=h; renderHistorial(h);
+    cerrar('ovEdit'); toast('✅ Cambios guardados');
   }
-  // Cerrar modal
-  const overlays = document.querySelectorAll('[style*="position:fixed"]');
-  overlays.forEach(o => { if (o.style.zIndex == 2000) o.remove(); });
 }
 
-// ========== LIMPIAR ==========
-function limpiarFormulario() {
-  if (!confirm('¿Limpiar el formulario actual?')) return;
-  setMondayDate();
-  initRows1();
-  initRows2();
-  recalc();
-}
-
-// ========== BORRAR SEMANA ==========
+// ---- BORRAR ----
 function confirmarBorrar(idx) {
-  const hist = window._historial || [];
-  const sorted = [...hist].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  const s = sorted[idx];
+  const s = getSorted()[idx];
   if (!s) return;
-
-  // Crear modal
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
-
-  overlay.innerHTML = `
-    <div style="background:white;border-radius:16px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.3);font-family:'Sora',sans-serif;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <div style="font-size:2.5rem;margin-bottom:8px;">⚠️</div>
-        <h3 style="color:#1a2e22;font-size:1.1rem;margin-bottom:8px;">¿Borrar esta semana?</h3>
-        <p style="color:#4a6b55;font-size:0.9rem;line-height:1.4;">
-          <strong>📅 ${formatFecha(s.fecha)}</strong><br>
-          Total: <strong style="font-family:monospace">${formatMoney(s.totalSemanal || 0)}</strong>
-        </p>
-        <p style="color:#e74c3c;font-size:0.8rem;margin-top:10px;">Esta acción no se puede deshacer.</p>
+  const ov = document.createElement('div');
+  ov.className='overlay'; ov.id='ovBorrar';
+  ov.innerHTML=`
+    <div class="modal" style="max-width:320px;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:8px;">⚠️</div>
+      <h3 style="color:#1a2e22;font-size:1.1rem;margin-bottom:8px;">¿Borrar esta semana?</h3>
+      <p style="color:#4a6b55;font-size:0.9rem;line-height:1.5;">
+        <strong>📅 ${fFecha(s.fecha)}</strong><br>
+        Total: <strong style="font-family:monospace">${fmt(s.totalSemanal||0)}</strong>
+      </p>
+      <p style="color:#e74c3c;font-size:0.8rem;margin-top:8px;">Esta acción no se puede deshacer.</p>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button onclick="cerrar('ovBorrar')" style="flex:1;padding:11px;border:2px solid var(--border);background:white;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;">Cancelar</button>
+        <button onclick="ejecutarBorrar(${idx})" style="flex:1;padding:11px;background:#e74c3c;border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:white;">Sí, borrar</button>
       </div>
-      <div style="display:flex;gap:10px;">
-        <button id="btnCancelarBorrar" style="flex:1;padding:11px;border:2px solid #c8e6d4;background:white;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:#4a6b55;">Cancelar</button>
-        <button id="btnConfirmarBorrar" style="flex:1;padding:11px;background:#e74c3c;border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:white;">Sí, borrar</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  document.getElementById('btnCancelarBorrar').onclick = () => document.body.removeChild(overlay);
-  overlay.onclick = (e) => { if (e.target === overlay) document.body.removeChild(overlay); };
-
-  document.getElementById('btnConfirmarBorrar').onclick = async () => {
-    document.body.removeChild(overlay);
-    await borrarSemana(s);
-  };
+    </div>`;
+  document.body.appendChild(ov);
 }
 
-async function borrarSemana(s) {
-  // Firebase
-  if (window._firebaseOk && window._borrarSemanaFirebase && s._fbKey) {
-    try {
-      await window._borrarSemanaFirebase(s._fbKey);
-      showToast('🗑️ Semana borrada');
-      return;
-    } catch(e) {
-      showToast('Error al borrar en la nube', true);
-    }
+async function ejecutarBorrar(idx) {
+  const s = getSorted()[idx];
+  cerrar('ovBorrar');
+  if (!s) return;
+  if (window._firebaseOk && s._fbKey && window._borrarSemana) {
+    try { await window._borrarSemana(s._fbKey); toast('🗑️ Semana borrada'); }
+    catch(e) { toast('Error al borrar',1); }
+  } else {
+    let h=JSON.parse(localStorage.getItem('hd')||'[]');
+    h=h.filter(x=>x.guardadoEn!==s.guardadoEn);
+    localStorage.setItem('hd',JSON.stringify(h));
+    window._historial=h; renderHistorial(h); toast('🗑️ Semana borrada');
   }
-  // Local
-  let hist = JSON.parse(localStorage.getItem('historial_dietetica') || '[]');
-  hist = hist.filter(h => !(h.fecha === s.fecha && h.guardadoEn === s.guardadoEn));
-  localStorage.setItem('historial_dietetica', JSON.stringify(hist));
-  window._historial = hist;
-  renderHistorial(hist);
-  showToast('🗑️ Semana borrada');
 }
 
-
-function showToast(msg, error = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (error ? ' error' : '') + ' show';
-  setTimeout(() => t.classList.remove('show'), 3000);
+// ---- UTILS ----
+function cerrar(id) { const el=document.getElementById(id); if(el) el.remove(); }
+function limpiar() { if(!confirm('¿Limpiar el formulario?')) return; setLunes(); initR1(); initR2(); }
+function toast(msg,err=0) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast'+(err?' err':'')+' show';
+  setTimeout(()=>t.classList.remove('show'),3000);
 }
 </script>
-
 </body>
 </html>
