@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dietética Semanal</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -26,498 +26,521 @@
     db = getDatabase(app);
     window._db = db;
     window._firebaseOk = true;
-  } catch(e) {
-    window._firebaseOk = false;
-  }
+  } catch(e) { window._firebaseOk = false; }
 
   window._initHistorial = function() {
     if (!window._firebaseOk) { cargarLocal(); return; }
-    const histRef = ref(db, 'historial');
-    onValue(histRef, (snapshot) => {
-      const data = snapshot.val();
-      const lista = data ? Object.entries(data).map(([k,v]) => ({...v, _fbKey: k})) : [];
+    onValue(ref(db,'historial'), (snap) => {
+      const data = snap.val();
+      const lista = data ? Object.entries(data).map(([k,v])=>({...v,_fbKey:k})) : [];
       window._historial = lista;
       renderHistorial(lista);
     });
   };
-
-  window._guardarSemana = async function(semana) {
-    const newRef = push(ref(db, 'historial'));
-    await set(newRef, semana);
-  };
-
-  window._borrarSemana = async function(fbKey) {
-    await remove(ref(db, 'historial/' + fbKey));
-  };
-
-  window._editarSemana = async function(fbKey, semana) {
-    const toSave = {...semana};
-    delete toSave._fbKey;
-    await set(ref(db, 'historial/' + fbKey), toSave);
-  };
+  window._guardarSemana = async (sem) => { const r = push(ref(db,'historial')); await set(r,sem); };
+  window._borrarSemana  = async (k)   => { await remove(ref(db,'historial/'+k)); };
+  window._editarSemana  = async (k,s) => { const t={...s}; delete t._fbKey; await set(ref(db,'historial/'+k),t); };
 </script>
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-
-  :root {
-    --verde: #1a7a4a; --verde-light: #2ecc71; --verde-pale: #e8f5ee;
-    --verde-mid: #b2dfca; --bg: #f4f9f6; --text: #1a2e22;
-    --text-mid: #4a6b55; --border: #c8e6d4;
-    --shadow: 0 2px 12px rgba(26,122,74,0.10); --radius: 12px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Sora', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-
-  header { background: var(--verde); color: white; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-  header h1 { font-size: 1.2rem; font-weight: 700; }
-  .subtitle { font-size: 0.75rem; opacity: 0.8; margin-top: 2px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: #ff4444; display: inline-block; margin-right: 5px; vertical-align: middle; }
-  .dot.on { background: var(--verde-light); }
-
-  .container { max-width: 700px; margin: 0 auto; padding: 16px; }
-
-  .fecha-row { background: white; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .fecha-row label { font-weight: 600; font-size: 0.9rem; color: var(--verde); }
-  .fecha-row input[type=date] { border: 2px solid var(--border); border-radius: 8px; padding: 8px 12px; font-family: 'Sora', sans-serif; font-size: 0.9rem; color: var(--text); background: var(--verde-pale); outline: none; }
-
-  .card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
-  .card-header { background: var(--verde); color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-  .card-header h2 { font-size: 1rem; font-weight: 600; }
-  .card-body { padding: 12px; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  thead th { background: var(--verde-pale); color: var(--verde); font-weight: 600; padding: 8px 10px; text-align: left; font-size: 0.8rem; text-transform: uppercase; }
-  tbody tr { border-bottom: 1px solid var(--border); }
-  tbody tr:last-child { border-bottom: none; }
-  tbody td { padding: 5px 4px; }
-
-  input.cell { width: 100%; border: 1px solid transparent; border-radius: 6px; padding: 6px 8px; font-family: 'Sora', sans-serif; font-size: 0.85rem; background: transparent; color: var(--text); outline: none; }
-  input.cell:focus { border-color: var(--verde); background: var(--verde-pale); }
-  input.cell.monto { font-family: 'JetBrains Mono', monospace; text-align: right; font-weight: 600; }
-  input.cell.fijo { font-weight: 700; color: var(--verde); }
-
-  .btn-add { background: none; border: 2px dashed var(--verde-mid); color: var(--verde); border-radius: 8px; padding: 7px 14px; font-family: 'Sora', sans-serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-top: 8px; width: 100%; }
-  .btn-add:hover { background: var(--verde-pale); }
-  .btn-del { background: none; border: none; color: #e74c3c; font-size: 1rem; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
-
-  .total-row td { background: var(--verde-pale); font-weight: 700; color: var(--verde); padding: 8px 10px; }
-  .total-row .mt { font-family: 'JetBrains Mono', monospace; font-size: 1rem; text-align: right; }
-
-  .total-semanal { background: var(--verde); color: white; border-radius: var(--radius); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(26,122,74,0.25); }
-  .total-semanal .label { font-size: 1rem; font-weight: 600; }
-  .total-semanal .monto { font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; font-weight: 700; }
-
-  .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-  .btn { flex: 1; min-width: 130px; padding: 12px 16px; border-radius: 10px; border: none; font-family: 'Sora', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
-  .btn-guardar { background: var(--verde); color: white; box-shadow: 0 4px 12px rgba(26,122,74,0.3); }
-  .btn-excel { background: #217346; color: white; }
-  .btn-limpiar { background: white; color: var(--text-mid); border: 2px solid var(--border); }
-
-  .hist-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
-  .hist-header { background: #2c3e50; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-  .hist-header h2 { font-size: 1rem; }
-  .hist-toggle { transition: transform 0.3s; }
-  .hist-toggle.open { transform: rotate(180deg); }
-  .hist-body { display: none; padding: 12px; }
-  .hist-body.visible { display: block; }
-
-  .sem-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
-  .sem-header { background: var(--verde-pale); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-  .sem-header .fl { font-weight: 600; color: var(--verde); font-size: 0.9rem; }
-  .sem-header .badge { background: var(--verde); color: white; border-radius: 20px; padding: 3px 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600; }
-  .sem-det { display: none; padding: 10px 14px; font-size: 0.82rem; }
-  .sem-det.visible { display: block; }
-
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; display: flex; align-items: flex-start; justify-content: center; padding: 16px; overflow-y: auto; }
-  .modal { background: white; border-radius: 16px; padding: 20px; max-width: 500px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.3); font-family: 'Sora', sans-serif; margin: auto; }
-
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--verde); color: white; padding: 12px 24px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; box-shadow: 0 4px 20px rgba(0,0,0,0.2); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); z-index: 9999; }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.err { background: #e74c3c; }
-
-  @media(max-width:500px){ .actions{flex-direction:column;} .btn{min-width:auto;} }
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --v:#1a7a4a;--vl:#2ecc71;--vp:#e8f5ee;--vm:#b2dfca;
+  --bg:#f4f9f6;--tx:#1a2e22;--tm:#4a6b55;--bd:#c8e6d4;
+  --sh:0 2px 12px rgba(26,122,74,.10);--r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+header{background:var(--v);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+header h1{font-size:1.2rem;font-weight:700}
+.sub{font-size:.75rem;opacity:.8;margin-top:2px}
+.dot{width:9px;height:9px;border-radius:50%;background:#f44;display:inline-block;margin-right:5px;vertical-align:middle}
+.dot.on{background:var(--vl)}
+.container{max-width:700px;margin:0 auto;padding:16px}
+.frow{background:#fff;border-radius:var(--r);padding:14px 16px;margin-bottom:16px;box-shadow:var(--sh);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.frow label{font-weight:600;font-size:.9rem;color:var(--v)}
+.frow input[type=date]{border:2px solid var(--bd);border-radius:8px;padding:8px 12px;font-family:'Sora',sans-serif;font-size:.9rem;color:var(--tx);background:var(--vp);outline:none}
+.card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);margin-bottom:16px;overflow:hidden}
+.ch{background:var(--v);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.ch h2{font-size:1rem;font-weight:600}
+.cb{padding:12px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+thead th{background:var(--vp);color:var(--v);font-weight:600;padding:8px 10px;text-align:left;font-size:.8rem;text-transform:uppercase}
+tbody tr{border-bottom:1px solid var(--bd)}
+tbody tr:last-child{border-bottom:none}
+tbody td{padding:5px 4px}
+input.cell{width:100%;border:1px solid transparent;border-radius:6px;padding:6px 8px;font-family:'Sora',sans-serif;font-size:.85rem;background:transparent;color:var(--tx);outline:none}
+input.cell:focus{border-color:var(--v);background:var(--vp)}
+input.cell.monto{font-family:'JetBrains Mono',monospace;text-align:right;font-weight:600}
+input.cell.fijo{font-weight:700;color:var(--v)}
+.btn-add{background:none;border:2px dashed var(--vm);color:var(--v);border-radius:8px;padding:7px 14px;font-family:'Sora',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;margin-top:8px;width:100%}
+.btn-add:hover{background:var(--vp)}
+.btn-del{background:none;border:none;color:#e74c3c;font-size:1rem;cursor:pointer;padding:2px 5px;border-radius:4px}
+.tr-tot td{background:var(--vp);font-weight:700;color:var(--v);padding:8px 10px}
+.tr-tot .mt{font-family:'JetBrains Mono',monospace;font-size:1rem;text-align:right}
+.tsem{background:var(--v);color:#fff;border-radius:var(--r);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;box-shadow:0 4px 16px rgba(26,122,74,.25)}
+.tsem .lbl{font-size:1rem;font-weight:600}
+.tsem .mnt{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700}
+.actions{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.btn{flex:1;min-width:130px;padding:12px 16px;border-radius:10px;border:none;font-family:'Sora',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.bg{background:var(--v);color:#fff;box-shadow:0 4px 12px rgba(26,122,74,.3)}
+.bx{background:#217346;color:#fff}
+.bl{background:#fff;color:var(--tm);border:2px solid var(--bd)}
+.hcard{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:16px}
+.hh{background:#2c3e50;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.hh h2{font-size:1rem}
+.htog{transition:transform .3s}
+.htog.open{transform:rotate(180deg)}
+.hb{display:none;padding:12px}
+.hb.vis{display:block}
+.si{border:1px solid var(--bd);border-radius:8px;margin-bottom:10px;overflow:hidden}
+.sh{background:var(--vp);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.sh .fl{font-weight:600;color:var(--v);font-size:.9rem}
+.sh .badge{background:var(--v);color:#fff;border-radius:20px;padding:3px 12px;font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:600}
+.sd{display:none;padding:10px 14px;font-size:.82rem}
+.sd.vis{display:block}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3000;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+.modal{background:#fff;border-radius:16px;padding:20px;max-width:500px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);font-family:'Sora',sans-serif;margin:auto}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--v);color:#fff;padding:12px 24px;border-radius:30px;font-weight:600;font-size:.9rem;box-shadow:0 4px 20px rgba(0,0,0,.2);transition:transform .4s cubic-bezier(.34,1.56,.64,1);z-index:9999}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{background:#e74c3c}
+@media(max-width:500px){.actions{flex-direction:column}.btn{min-width:auto}}
 </style>
 </head>
 <body>
-
 <header>
   <div>
     <h1>🌿 Dietética Semanal</h1>
-    <div class="subtitle"><span class="dot" id="dot"></span><span id="statusTxt">Conectando...</span></div>
+    <div class="sub"><span class="dot" id="dot"></span><span id="stxt">Conectando...</span></div>
   </div>
 </header>
-
 <div class="container">
-
-  <div class="fecha-row">
+  <div class="frow">
     <label>📅 Semana del lunes:</label>
     <input type="date" id="fechaSemana">
   </div>
-
   <div class="card">
-    <div class="card-header">
-      <h2>↩️ Devoluciones</h2>
-      <span id="b1" style="font-family:'JetBrains Mono',monospace;font-size:0.9rem;">$0</span>
-    </div>
-    <div class="card-body">
+    <div class="ch"><h2>↩️ Devoluciones</h2><span id="b1" style="font-family:'JetBrains Mono',monospace;font-size:.9rem">$0</span></div>
+    <div class="cb">
       <table>
         <thead><tr><th style="width:30%">Código/Nombre</th><th style="width:40%">Descripción</th><th style="width:25%">Importe</th><th style="width:5%"></th></tr></thead>
         <tbody id="tb1"></tbody>
-        <tfoot><tr class="total-row"><td colspan="2"><strong>TOTAL</strong></td><td class="mt" id="t1">$0</td><td></td></tr></tfoot>
+        <tfoot><tr class="tr-tot"><td colspan="2"><strong>TOTAL</strong></td><td class="mt" id="t1">$0</td><td></td></tr></tfoot>
       </table>
       <button class="btn-add" onclick="addRow1()">+ Agregar devolución</button>
     </div>
   </div>
-
   <div class="card">
-    <div class="card-header">
-      <h2>🏷️ Descuentos</h2>
-      <span id="b2" style="font-family:'JetBrains Mono',monospace;font-size:0.9rem;">$0</span>
-    </div>
-    <div class="card-body">
+    <div class="ch"><h2>🏷️ Descuentos</h2><span id="b2" style="font-family:'JetBrains Mono',monospace;font-size:.9rem">$0</span></div>
+    <div class="cb">
       <table>
         <thead><tr><th style="width:45%">Código/Nombre</th><th style="width:50%">Importe</th><th style="width:5%"></th></tr></thead>
         <tbody id="tb2"></tbody>
-        <tfoot><tr class="total-row"><td><strong>TOTAL</strong></td><td class="mt" id="t2">$0</td><td></td></tr></tfoot>
+        <tfoot><tr class="tr-tot"><td><strong>TOTAL</strong></td><td class="mt" id="t2">$0</td><td></td></tr></tfoot>
       </table>
       <button class="btn-add" onclick="addRow2()">+ Agregar descuento extra</button>
     </div>
   </div>
-
-  <div class="total-semanal">
-    <div class="label">💰 TOTAL SEMANAL</div>
-    <div class="monto" id="tSem">$0</div>
-  </div>
-
+  <div class="tsem"><div class="lbl">💰 TOTAL SEMANAL</div><div class="mnt" id="tSem">$0</div></div>
   <div class="actions">
-    <button class="btn btn-guardar" onclick="guardarSemana()">💾 Guardar semana</button>
-    <button class="btn btn-excel" onclick="excelTotal()">📊 Excel completo</button>
-    <button class="btn btn-limpiar" onclick="limpiar()">🗑️ Limpiar</button>
+    <button class="btn bg" onclick="guardarSemana()">💾 Guardar semana</button>
+    <button class="btn bx" onclick="excelTotal()">📊 Excel completo</button>
+    <button class="btn bl" onclick="limpiar()">🗑️ Limpiar</button>
   </div>
-
-  <div class="hist-card">
-    <div class="hist-header" onclick="toggleHist()">
-      <h2>📋 Historial de semanas</h2>
-      <span class="hist-toggle" id="histTog">▼</span>
-    </div>
-    <div class="hist-body" id="histBody">
-      <div id="histCont" style="color:#888;font-size:0.85rem;text-align:center;padding:20px;">Cargando...</div>
-    </div>
+  <div class="hcard">
+    <div class="hh" onclick="toggleHist()"><h2>📋 Historial de semanas</h2><span class="htog" id="htog">▼</span></div>
+    <div class="hb" id="hb"><div id="hc" style="color:#888;font-size:.85rem;text-align:center;padding:20px">Cargando...</div></div>
   </div>
-
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
-let rows1 = [], rows2 = [];
-const FIXED = ['s61ma','s5mi','s23ju'];
+let rows1=[],rows2=[];
+const FIXED=['s61ma','s5mi','s23ju'];
 
-window.addEventListener('load', () => {
-  setLunes();
-  initR1(); initR2();
-  setTimeout(() => {
-    if (window._initHistorial) window._initHistorial();
-    else cargarLocal();
-    // estado conexión
-    const d = document.getElementById('dot');
-    const t = document.getElementById('statusTxt');
-    if (window._firebaseOk) { d.className='dot on'; t.textContent='Sincronizado en la nube ☁️'; }
-    else { d.className='dot'; t.textContent='Solo local'; }
-  }, 900);
+window.addEventListener('load',()=>{
+  setLunes(); initR1(); initR2();
+  setTimeout(()=>{
+    if(window._initHistorial) window._initHistorial(); else cargarLocal();
+    const d=document.getElementById('dot'),t=document.getElementById('stxt');
+    if(window._firebaseOk){d.className='dot on';t.textContent='Sincronizado en la nube ☁️';}
+    else{d.className='dot';t.textContent='Solo local';}
+  },900);
 });
 
-function setLunes() {
-  const hoy = new Date();
-  const diff = hoy.getDay()===0 ? -6 : 1-hoy.getDay();
-  const lun = new Date(hoy); lun.setDate(hoy.getDate()+diff);
-  document.getElementById('fechaSemana').value = lun.toISOString().split('T')[0];
+function setLunes(){
+  const h=new Date(),diff=h.getDay()===0?-6:1-h.getDay(),l=new Date(h);
+  l.setDate(h.getDate()+diff);
+  document.getElementById('fechaSemana').value=l.toISOString().split('T')[0];
 }
 
-// ---- TABLA 1 ----
-function initR1() { rows1=[{id:Date.now(),codigo:'',desc:'galletas rotas',imp:''}]; renderT1(); }
-function addRow1() { rows1.push({id:Date.now(),codigo:'',desc:'galletas rotas',imp:''}); renderT1(); }
-function delR1(id) { rows1=rows1.filter(r=>r.id!==id); renderT1(); }
-function updR1(id,f,v) { const r=rows1.find(r=>r.id===id); if(r){r[f]=v;recalc();} }
-function renderT1() {
-  document.getElementById('tb1').innerHTML = rows1.map(r=>`
-    <tr>
-      <td><input class="cell" value="${esc(r.codigo)}" oninput="updR1(${r.id},'codigo',this.value)" placeholder="Código/Nombre"></td>
-      <td><input class="cell" value="${esc(r.desc)}" oninput="updR1(${r.id},'desc',this.value)" placeholder="galletas rotas"></td>
-      <td><input class="cell monto" type="number" value="${r.imp}" oninput="updR1(${r.id},'imp',this.value)" placeholder="0"></td>
-      <td><button class="btn-del" onclick="delR1(${r.id})">✕</button></td>
-    </tr>`).join('');
-  recalc();
+function initR1(){rows1=[{id:Date.now(),codigo:'',desc:'galletas rotas',imp:''}];renderT1();}
+function addRow1(){rows1.push({id:Date.now(),codigo:'',desc:'galletas rotas',imp:''});renderT1();}
+function delR1(id){rows1=rows1.filter(r=>r.id!==id);renderT1();}
+function updR1(id,f,v){const r=rows1.find(r=>r.id===id);if(r){r[f]=v;recalc();}}
+function renderT1(){
+  document.getElementById('tb1').innerHTML=rows1.map(r=>`<tr>
+    <td><input class="cell" value="${esc(r.codigo)}" oninput="updR1(${r.id},'codigo',this.value)" placeholder="Código/Nombre"></td>
+    <td><input class="cell" value="${esc(r.desc)}" oninput="updR1(${r.id},'desc',this.value)" placeholder="galletas rotas"></td>
+    <td><input class="cell monto" type="number" value="${r.imp}" oninput="updR1(${r.id},'imp',this.value)" placeholder="0"></td>
+    <td><button class="btn-del" onclick="delR1(${r.id})">✕</button></td>
+  </tr>`).join('');recalc();
 }
 
-// ---- TABLA 2 ----
-function initR2() { rows2=FIXED.map(c=>({id:c,codigo:c,imp:'',fixed:true})); renderT2(); }
-function addRow2() { rows2.push({id:'x'+Date.now(),codigo:'',imp:'',fixed:false}); renderT2(); }
-function delR2(id) { const r=rows2.find(r=>r.id===id); if(r&&r.fixed){toast('No se puede eliminar un cliente fijo',1);return;} rows2=rows2.filter(r=>r.id!==id); renderT2(); }
-function updR2(id,f,v) { const r=rows2.find(r=>r.id===id); if(r){r[f]=v;recalc();} }
-function renderT2() {
-  document.getElementById('tb2').innerHTML = rows2.map(r=>`
-    <tr>
-      <td>${r.fixed
-        ? `<input class="cell fijo" value="${esc(r.codigo)}" readonly>`
-        : `<input class="cell" value="${esc(r.codigo)}" oninput="updR2('${r.id}','codigo',this.value)" placeholder="Código/Nombre">`}
-      </td>
-      <td><input class="cell monto" type="number" value="${r.imp}" oninput="updR2('${r.id}','imp',this.value)" placeholder="0"></td>
-      <td>${r.fixed?'':'<button class="btn-del" onclick="delR2(\''+r.id+'\')">✕</button>'}</td>
-    </tr>`).join('');
-  recalc();
+function initR2(){rows2=FIXED.map(c=>({id:c,codigo:c,imp:'',fixed:true}));renderT2();}
+function addRow2(){rows2.push({id:'x'+Date.now(),codigo:'',imp:'',fixed:false});renderT2();}
+function delR2(id){
+  const r=rows2.find(r=>r.id===id);
+  if(r&&r.fixed){toast('No se puede eliminar un cliente fijo',1);return;}
+  rows2=rows2.filter(r=>r.id!==id);renderT2();
+}
+function updR2(id,f,v){const r=rows2.find(r=>r.id===id);if(r){r[f]=v;recalc();}}
+function renderT2(){
+  document.getElementById('tb2').innerHTML=rows2.map(r=>`<tr>
+    <td>${r.fixed?`<input class="cell fijo" value="${esc(r.codigo)}" readonly>`:`<input class="cell" value="${esc(r.codigo)}" oninput="updR2('${r.id}','codigo',this.value)" placeholder="Código/Nombre">`}</td>
+    <td><input class="cell monto" type="number" value="${r.imp}" oninput="updR2('${r.id}','imp',this.value)" placeholder="0"></td>
+    <td>${r.fixed?'':'<button class="btn-del" onclick="delR2(\''+r.id+'\')">✕</button>'}</td>
+  </tr>`).join('');recalc();
 }
 
-// ---- CALCULOS ----
-function recalc() {
-  const v1 = rows1.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
-  const v2 = rows2.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
+function recalc(){
+  const v1=rows1.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
+  const v2=rows2.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
   document.getElementById('t1').textContent=fmt(v1);
   document.getElementById('b1').textContent=fmt(v1);
   document.getElementById('t2').textContent=fmt(v2);
   document.getElementById('b2').textContent=fmt(v2);
   document.getElementById('tSem').textContent=fmt(v1+v2);
 }
+function fmt(n){return'$'+(parseFloat(n)||0).toLocaleString('es-AR');}
+function fF(f){if(!f)return'-';const[y,m,d]=f.split('-');return`${d}/${m}/${y}`;}
+function esc(s){return(s||'').replace(/"/g,'&quot;');}
 
-function fmt(n) { return '$'+(parseFloat(n)||0).toLocaleString('es-AR'); }
-function fFecha(f) { if(!f)return'-'; const[y,m,d]=f.split('-'); return`${d}/${m}/${y}`; }
-function esc(s) { return (s||'').replace(/"/g,'&quot;'); }
-
-// ---- GUARDAR ----
-function guardarSemana() {
-  const fecha = document.getElementById('fechaSemana').value;
-  if (!fecha) { toast('Seleccioná la fecha primero',1); return; }
+// GUARDAR
+function guardarSemana(){
+  const fecha=document.getElementById('fechaSemana').value;
+  if(!fecha){toast('Seleccioná la fecha primero',1);return;}
   const t1=rows1.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
   const t2=rows2.reduce((s,r)=>s+(parseFloat(r.imp)||0),0);
-  const sem = {
-    fecha,
-    dieteticas: rows1.map(r=>({codigo:r.codigo,descripcion:r.desc,importe:parseFloat(r.imp)||0})),
-    clientes: rows2.map(r=>({codigo:r.codigo,importe:parseFloat(r.imp)||0,fixed:r.fixed||false})),
-    total1:t1, total2:t2, totalSemanal:t1+t2,
-    guardadoEn: new Date().toISOString()
-  };
-  if (window._firebaseOk && window._guardarSemana) {
+  const sem={fecha,
+    dieteticas:rows1.map(r=>({codigo:r.codigo,descripcion:r.desc,importe:parseFloat(r.imp)||0})),
+    clientes:rows2.map(r=>({codigo:r.codigo,importe:parseFloat(r.imp)||0,fixed:r.fixed||false})),
+    total1:t1,total2:t2,totalSemanal:t1+t2,guardadoEn:new Date().toISOString()};
+  if(window._firebaseOk&&window._guardarSemana)
     window._guardarSemana(sem).then(()=>toast('✅ Guardado en la nube')).catch(()=>toast('Error al guardar',1));
-  } else {
-    guardarLocal(sem); toast('✅ Semana guardada');
-  }
+  else{guardarLocal(sem);toast('✅ Semana guardada');}
 }
+function guardarLocal(s){const h=JSON.parse(localStorage.getItem('hd')||'[]');h.unshift(s);localStorage.setItem('hd',JSON.stringify(h));window._historial=h;renderHistorial(h);}
+function cargarLocal(){const h=JSON.parse(localStorage.getItem('hd')||'[]');window._historial=h;renderHistorial(h);}
 
-function guardarLocal(s) {
-  const h=JSON.parse(localStorage.getItem('hd')||'[]'); h.unshift(s);
-  localStorage.setItem('hd',JSON.stringify(h)); window._historial=h; renderHistorial(h);
-}
-function cargarLocal() {
-  const h=JSON.parse(localStorage.getItem('hd')||'[]'); window._historial=h; renderHistorial(h);
-}
+// HISTORIAL
+function toggleHist(){document.getElementById('hb').classList.toggle('vis');document.getElementById('htog').classList.toggle('open');}
+function getSorted(){return[...(window._historial||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));}
 
-// ---- HISTORIAL ----
-function toggleHist() {
-  document.getElementById('histBody').classList.toggle('visible');
-  document.getElementById('histTog').classList.toggle('open');
-}
-function getSorted() { return [...(window._historial||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha)); }
-
-function renderHistorial(lista) {
-  const cont = document.getElementById('histCont');
-  if (!lista||lista.length===0) { cont.innerHTML='<p style="color:#888;text-align:center;padding:20px;">No hay semanas guardadas aún.</p>'; return; }
-  const sorted = [...lista].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  cont.innerHTML = sorted.map((s,i)=>`
-    <div class="sem-item">
-      <div class="sem-header" onclick="togDet('d${i}')">
-        <span class="fl">📅 ${fFecha(s.fecha)}</span>
+function renderHistorial(lista){
+  const c=document.getElementById('hc');
+  if(!lista||!lista.length){c.innerHTML='<p style="color:#888;text-align:center;padding:20px">No hay semanas guardadas aún.</p>';return;}
+  const sorted=[...lista].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  c.innerHTML=sorted.map((s,i)=>`
+    <div class="si">
+      <div class="sh" onclick="togD('d${i}')">
+        <span class="fl">📅 ${fF(s.fecha)}</span>
         <span class="badge">${fmt(s.totalSemanal||0)}</span>
       </div>
-      <div class="sem-det" id="d${i}">
-        <strong style="color:var(--verde);font-size:0.8rem;">↩️ DEVOLUCIONES</strong>
-        <table style="margin:6px 0 10px;">
+      <div class="sd" id="d${i}">
+        <strong style="color:var(--v);font-size:.8rem">↩️ DEVOLUCIONES</strong>
+        <table style="margin:6px 0 10px">
           <thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right">Importe</th></tr></thead>
           <tbody>${(s.dieteticas||[]).map(d=>`<tr><td>${d.codigo||'-'}</td><td>${d.descripcion||'-'}</td><td style="text-align:right;font-family:monospace">${fmt(d.importe)}</td></tr>`).join('')}</tbody>
           <tfoot><tr><td colspan="2" style="font-weight:700">Total</td><td style="text-align:right;font-weight:700;font-family:monospace">${fmt(s.total1)}</td></tr></tfoot>
         </table>
-        <strong style="color:var(--verde);font-size:0.8rem;">🏷️ DESCUENTOS</strong>
-        <table style="margin:6px 0;">
+        <strong style="color:var(--v);font-size:.8rem">🏷️ DESCUENTOS</strong>
+        <table style="margin:6px 0">
           <thead><tr><th>Código</th><th style="text-align:right">Importe</th></tr></thead>
           <tbody>${(s.clientes||[]).map(c=>`<tr><td>${c.codigo||'-'}</td><td style="text-align:right;font-family:monospace">${fmt(c.importe)}</td></tr>`).join('')}</tbody>
           <tfoot><tr><td style="font-weight:700">Total</td><td style="text-align:right;font-weight:700;font-family:monospace">${fmt(s.total2)}</td></tr></tfoot>
         </table>
-        <div style="background:var(--verde);color:white;border-radius:6px;padding:6px 12px;display:flex;justify-content:space-between;margin-top:6px;">
+        <div style="background:var(--v);color:#fff;border-radius:6px;padding:6px 12px;display:flex;justify-content:space-between;margin-top:6px">
           <strong>TOTAL SEMANAL</strong><strong style="font-family:monospace">${fmt(s.totalSemanal)}</strong>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-          <button onclick="excelSemana(${i})" style="flex:1;min-width:70px;background:#217346;color:white;border:none;border-radius:6px;padding:8px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">📊 Excel</button>
-          <button onclick="abrirEditar(${i})" style="flex:1;min-width:70px;background:#2980b9;color:white;border:none;border-radius:6px;padding:8px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">✏️ Editar</button>
-          <button onclick="confirmarBorrar(${i})" style="flex:1;min-width:70px;background:#e74c3c;color:white;border:none;border-radius:6px;padding:8px;font-size:0.8rem;cursor:pointer;font-family:'Sora',sans-serif;">🗑️ Borrar</button>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button onclick="excelSemana(${i})" style="flex:1;min-width:70px;background:#217346;color:#fff;border:none;border-radius:6px;padding:8px;font-size:.8rem;cursor:pointer;font-family:'Sora',sans-serif">📊 Excel</button>
+          <button onclick="abrirEditar(${i})" style="flex:1;min-width:70px;background:#2980b9;color:#fff;border:none;border-radius:6px;padding:8px;font-size:.8rem;cursor:pointer;font-family:'Sora',sans-serif">✏️ Editar</button>
+          <button onclick="confirmarBorrar(${i})" style="flex:1;min-width:70px;background:#e74c3c;color:#fff;border:none;border-radius:6px;padding:8px;font-size:.8rem;cursor:pointer;font-family:'Sora',sans-serif">🗑️ Borrar</button>
         </div>
       </div>
     </div>`).join('');
 }
+function togD(id){document.getElementById(id).classList.toggle('vis');}
 
-function togDet(id) { document.getElementById(id).classList.toggle('visible'); }
+// ===== EXCEL CON ESTILOS =====
+// Colores
+const CV='1A7A4A', CVL='E8F5EE', CVM='B2DFCA', CB='FFFFFF', CG='F4F9F6', CA='FFF3CD';
 
-// ---- EXCEL ----
-function excelTotal() {
-  const hist = window._historial||[];
-  if (!hist.length) { toast('No hay semanas guardadas',1); return; }
-  const sorted = [...hist].sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const wb = XLSX.utils.book_new();
-  const r=[['Fecha','Total Devoluciones','Total Descuentos','Total Semanal']];
-  sorted.forEach(s=>r.push([fFecha(s.fecha),s.total1||0,s.total2||0,s.totalSemanal||0]));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r),'Resumen');
-  const d1=[['Semana','Código','Descripción','Importe']];
-  sorted.forEach(s=>{(s.dieteticas||[]).forEach(d=>d1.push([fFecha(s.fecha),d.codigo,d.descripcion,d.importe]));d1.push([fFecha(s.fecha),'','SUBTOTAL',s.total1]);d1.push([]);});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d1),'Devoluciones');
-  const d2=[['Semana','Código','Importe']];
-  sorted.forEach(s=>{(s.clientes||[]).forEach(c=>d2.push([fFecha(s.fecha),c.codigo,c.importe]));d2.push([fFecha(s.fecha),'SUBTOTAL',s.total2]);d2.push([]);});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d2),'Descuentos');
-  XLSX.writeFile(wb,`dietetica_${new Date().toISOString().split('T')[0]}.xlsx`);
+function cellS(v, opts={}){
+  return {
+    v: v,
+    t: typeof v==='number'?'n':'s',
+    s: {
+      font:{name:'Arial', bold:!!opts.bold, sz:opts.sz||10, color:{rgb: opts.fc||'000000'}},
+      fill:{patternType:'solid', fgColor:{rgb: opts.bg||CB}},
+      alignment:{horizontal:opts.align||'left', vertical:'center', wrapText:!!opts.wrap},
+      border:{
+        top:{style:'thin',color:{rgb:'C8E6D4'}},
+        bottom:{style:'thin',color:{rgb:'C8E6D4'}},
+        left:{style:'thin',color:{rgb:'C8E6D4'}},
+        right:{style:'thin',color:{rgb:'C8E6D4'}}
+      },
+      numFmt: opts.numFmt||''
+    }
+  };
+}
+
+function buildSheet(aoa, colWidths){
+  const ws = XLSX.utils.aoa_to_sheet(aoa.map(r=>r.map(c=>typeof c==='object'&&c!==null&&'v' in c ? c.v : c)));
+  // aplicar estilos
+  aoa.forEach((row,ri)=>row.forEach((cell,ci)=>{
+    if(typeof cell==='object'&&cell!==null&&cell.s){
+      const addr=XLSX.utils.encode_cell({r:ri,c:ci});
+      if(!ws[addr]) ws[addr]={t:'s',v:''};
+      ws[addr].s=cell.s;
+      if(cell.t) ws[addr].t=cell.t;
+    }
+  }));
+  ws['!cols']=colWidths.map(w=>({wch:w}));
+  return ws;
+}
+
+function hdr(txt,opts={}){return cellS(txt,{bold:true,bg:opts.bg||CV,fc:opts.fc||CB,sz:opts.sz||10,align:'center',wrap:true});}
+function dat(v,opts={}){return cellS(v,{bg:opts.bg||CB,bold:opts.bold||false,align:opts.align||'left',numFmt:opts.numFmt||''});}
+function tot(v,opts={}){return cellS(v,{bold:true,bg:opts.bg||CVL,fc:CV,align:'right',numFmt:opts.numFmt||'#,##0'});}
+function titulo(txt){return cellS(txt,{bold:true,sz:13,bg:CV,fc:CB,align:'center'});}
+
+function excelTotal(){
+  const hist=window._historial||[];
+  if(!hist.length){toast('No hay semanas guardadas',1);return;}
+  const sorted=[...hist].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const wb=XLSX.utils.book_new();
+
+  // ---- RESUMEN ----
+  let aoa=[];
+  aoa.push([titulo('RESUMEN SEMANAL — DIETÉTICA'),'','','']);
+  aoa.push(['','','','']); // espacio
+  aoa.push([hdr('Semana'),hdr('Total Devoluciones'),hdr('Total Descuentos'),hdr('Total Semanal')]);
+  let tDev=0,tDesc=0,tSem=0;
+  sorted.forEach((s,i)=>{
+    const bg=i%2===0?CB:CG;
+    aoa.push([
+      dat(fF(s.fecha),{bg,align:'center'}),
+      dat(s.total1||0,{bg,align:'right',numFmt:'#,##0'}),
+      dat(s.total2||0,{bg,align:'right',numFmt:'#,##0'}),
+      dat(s.totalSemanal||0,{bg,bold:true,align:'right',numFmt:'#,##0'})
+    ]);
+    tDev+=s.total1||0;tDesc+=s.total2||0;tSem+=s.totalSemanal||0;
+  });
+  aoa.push([
+    cellS('TOTAL GENERAL',{bold:true,bg:CA,fc:'856404',align:'center'}),
+    tot(tDev,{bg:CA}),tot(tDesc,{bg:CA}),
+    cellS(tSem,{bold:true,sz:11,bg:CA,fc:'856404',align:'right',numFmt:'#,##0'})
+  ]);
+  const wsR=buildSheet(aoa,[16,22,22,22]);
+  // merge título
+  wsR['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}}];
+  XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
+
+  // ---- DEVOLUCIONES ----
+  aoa=[];
+  aoa.push([titulo('DEVOLUCIONES POR SEMANA'),'','','']);
+  aoa.push(['','','','']);
+  aoa.push([hdr('Semana'),hdr('Código / Nombre'),hdr('Descripción'),hdr('Importe')]);
+  sorted.forEach(s=>{
+    (s.dieteticas||[]).forEach((d,i)=>{
+      const bg=i%2===0?CB:CG;
+      aoa.push([
+        dat(i===0?fF(s.fecha):'',{bg,align:'center'}),
+        dat(d.codigo||'',{bg}),
+        dat(d.descripcion||'',{bg}),
+        dat(d.importe||0,{bg,align:'right',numFmt:'#,##0'})
+      ]);
+    });
+    aoa.push([cellS('',{bg:CVL}),cellS('',{bg:CVL}),
+      cellS('SUBTOTAL',{bold:true,bg:CVL,fc:CV,align:'right'}),
+      tot(s.total1||0)]);
+    aoa.push(['','','','']);
+  });
+  const wsD=buildSheet(aoa,[16,20,26,16]);
+  wsD['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}}];
+  XLSX.utils.book_append_sheet(wb,wsD,'Devoluciones');
+
+  // ---- DESCUENTOS ----
+  aoa=[];
+  aoa.push([titulo('DESCUENTOS POR SEMANA'),'','']);
+  aoa.push(['','','']);
+  aoa.push([hdr('Semana'),hdr('Código / Nombre'),hdr('Importe')]);
+  sorted.forEach(s=>{
+    (s.clientes||[]).forEach((c,i)=>{
+      const bg=i%2===0?CB:CG;
+      aoa.push([
+        dat(i===0?fF(s.fecha):'',{bg,align:'center'}),
+        dat(c.codigo||'',{bg}),
+        dat(c.importe||0,{bg,align:'right',numFmt:'#,##0'})
+      ]);
+    });
+    aoa.push([cellS('',{bg:CVL}),
+      cellS('SUBTOTAL',{bold:true,bg:CVL,fc:CV,align:'right'}),
+      tot(s.total2||0)]);
+    aoa.push(['','','']);
+  });
+  const wsC=buildSheet(aoa,[16,25,16]);
+  wsC['!merges']=[{s:{r:0,c:0},e:{r:0,c:2}}];
+  XLSX.utils.book_append_sheet(wb,wsC,'Descuentos');
+
+  XLSX.writeFile(wb,`dietetica_${new Date().toISOString().split('T')[0]}.xlsx`,{bookType:'xlsx',type:'binary',cellStyles:true});
   toast('📊 Excel descargado');
 }
 
-function excelSemana(idx) {
-  const sorted = getSorted();
-  const s = sorted[idx];
-  if (!s) { toast('Error al exportar',1); return; }
-  const wb = XLSX.utils.book_new();
-  const data = [
-    [`Semana del: ${fFecha(s.fecha)}`],[],
-    ['DEVOLUCIONES'],['Código','Descripción','Importe'],
-    ...(s.dieteticas||[]).map(d=>[d.codigo,d.descripcion,d.importe]),
-    ['','TOTAL DEVOLUCIONES',s.total1],[],
-    ['DESCUENTOS'],['Código','Importe'],
-    ...(s.clientes||[]).map(c=>[c.codigo,c.importe]),
-    ['TOTAL DESCUENTOS',s.total2],[],
-    ['TOTAL SEMANAL','',s.totalSemanal]
+function excelSemana(idx){
+  const sorted=getSorted(), s=sorted[idx];
+  if(!s){toast('Error al exportar',1);return;}
+  const wb=XLSX.utils.book_new();
+  let aoa=[];
+
+  aoa.push([titulo(`SEMANA DEL ${fF(s.fecha)}`),'','']);
+  aoa.push(['','','']);
+  aoa.push([hdr('↩️ DEVOLUCIONES'),'','']);
+  aoa.push([hdr('Código',{bg:CVM,fc:CV}),hdr('Descripción',{bg:CVM,fc:CV}),hdr('Importe',{bg:CVM,fc:CV})]);
+  (s.dieteticas||[]).forEach((d,i)=>{
+    const bg=i%2===0?CB:CG;
+    aoa.push([dat(d.codigo||'',{bg}),dat(d.descripcion||'',{bg}),dat(d.importe||0,{bg,align:'right',numFmt:'#,##0'})]);
+  });
+  aoa.push([cellS('',{bg:CVL}),cellS('TOTAL DEVOLUCIONES',{bold:true,bg:CVL,fc:CV,align:'right'}),tot(s.total1||0)]);
+  aoa.push(['','','']);
+
+  aoa.push([hdr('🏷️ DESCUENTOS'),'','']);
+  aoa.push([hdr('Código',{bg:CVM,fc:CV}),hdr('Importe',{bg:CVM,fc:CV}),'']);
+  (s.clientes||[]).forEach((c,i)=>{
+    const bg=i%2===0?CB:CG;
+    aoa.push([dat(c.codigo||'',{bg}),dat(c.importe||0,{bg,align:'right',numFmt:'#,##0'}),dat('',{bg})]);
+  });
+  aoa.push([cellS('',{bg:CVL}),cellS('TOTAL DESCUENTOS',{bold:true,bg:CVL,fc:CV,align:'right'}),tot(s.total2||0)]);
+  aoa.push(['','','']);
+
+  aoa.push([
+    cellS('',{bg:CV}),
+    cellS('TOTAL SEMANAL',{bold:true,sz:12,bg:CV,fc:CB,align:'right'}),
+    cellS(s.totalSemanal||0,{bold:true,sz:12,bg:CV,fc:CB,align:'right',numFmt:'#,##0'})
+  ]);
+
+  const ws=buildSheet(aoa,[20,26,16]);
+  ws['!merges']=[
+    {s:{r:0,c:0},e:{r:0,c:2}},
+    {s:{r:2,c:0},e:{r:2,c:2}},
+    {s:{r:3+( (s.dieteticas||[]).length)+1+1,c:0},e:{r:3+(s.dieteticas||[]).length+1+1,c:2}},
   ];
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),'Semana');
-  XLSX.writeFile(wb,`semana_${s.fecha}.xlsx`);
+  XLSX.utils.book_append_sheet(wb,ws,'Semana');
+  XLSX.writeFile(wb,`semana_${s.fecha}.xlsx`,{bookType:'xlsx',type:'binary',cellStyles:true});
   toast('📊 Excel descargado');
 }
 
-// ---- EDITAR ----
-function abrirEditar(idx) {
-  const s = getSorted()[idx];
-  if (!s) return;
-  window.eT = JSON.parse(JSON.stringify(s)); // editTemp
-
-  const ov = document.createElement('div');
-  ov.className='overlay'; ov.id='ovEdit';
-  ov.innerHTML=`
-    <div class="modal">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <h3 style="color:var(--verde);font-size:1rem;">✏️ Editar — ${fFecha(s.fecha)}</h3>
-        <button onclick="cerrar('ovEdit')" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;">✕</button>
-      </div>
-      <strong style="color:var(--verde);font-size:0.8rem;">↩️ DEVOLUCIONES</strong>
-      <table style="width:100%;margin:6px 0 4px;">
-        <thead><tr><th style="width:28%">Código</th><th style="width:40%">Descripción</th><th style="width:27%">Importe</th><th></th></tr></thead>
-        <tbody id="et1">${eRows1()}</tbody>
-      </table>
-      <button class="btn-add" onclick="eAdd1()" style="margin-bottom:12px;">+ Agregar</button>
-      <strong style="color:var(--verde);font-size:0.8rem;">🏷️ DESCUENTOS</strong>
-      <table style="width:100%;margin:6px 0 4px;">
-        <thead><tr><th style="width:45%">Código</th><th style="width:50%">Importe</th><th></th></tr></thead>
-        <tbody id="et2">${eRows2()}</tbody>
-      </table>
-      <button class="btn-add" onclick="eAdd2()" style="margin-bottom:12px;">+ Agregar</button>
-      <div style="background:var(--verde);color:white;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;margin-bottom:14px;">
-        <strong>TOTAL SEMANAL</strong>
-        <strong id="eTot" style="font-family:monospace;">${fmt((s.total1||0)+(s.total2||0))}</strong>
-      </div>
-      <div style="display:flex;gap:10px;">
-        <button onclick="cerrar('ovEdit')" style="flex:1;padding:11px;border:2px solid var(--border);background:white;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:var(--text-mid);">Cancelar</button>
-        <button onclick="guardarEdit()" style="flex:1;padding:11px;background:var(--verde);border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:white;">💾 Guardar</button>
-      </div>
-    </div>`;
+// EDITAR
+function abrirEditar(idx){
+  const s=getSorted()[idx]; if(!s)return;
+  window.eT=JSON.parse(JSON.stringify(s));
+  const ov=document.createElement('div'); ov.className='overlay'; ov.id='ovE';
+  ov.innerHTML=`<div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="color:var(--v);font-size:1rem">✏️ Editar — ${fF(s.fecha)}</h3>
+      <button onclick="cerrar('ovE')" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888">✕</button>
+    </div>
+    <strong style="color:var(--v);font-size:.8rem">↩️ DEVOLUCIONES</strong>
+    <table style="width:100%;margin:6px 0 4px">
+      <thead><tr><th style="width:28%">Código</th><th style="width:40%">Descripción</th><th style="width:27%">Importe</th><th></th></tr></thead>
+      <tbody id="et1">${eR1()}</tbody>
+    </table>
+    <button class="btn-add" onclick="eA1()" style="margin-bottom:12px">+ Agregar</button>
+    <strong style="color:var(--v);font-size:.8rem">🏷️ DESCUENTOS</strong>
+    <table style="width:100%;margin:6px 0 4px">
+      <thead><tr><th style="width:45%">Código</th><th style="width:50%">Importe</th><th></th></tr></thead>
+      <tbody id="et2">${eR2()}</tbody>
+    </table>
+    <button class="btn-add" onclick="eA2()" style="margin-bottom:12px">+ Agregar</button>
+    <div style="background:var(--v);color:#fff;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;margin-bottom:14px">
+      <strong>TOTAL SEMANAL</strong><strong id="eTot" style="font-family:monospace">${fmt((s.total1||0)+(s.total2||0))}</strong>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="cerrar('ovE')" style="flex:1;padding:11px;border:2px solid var(--bd);background:#fff;border-radius:10px;font-family:'Sora',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;color:var(--tm)">Cancelar</button>
+      <button onclick="guardarEdit()" style="flex:1;padding:11px;background:var(--v);border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;color:#fff">💾 Guardar</button>
+    </div>
+  </div>`;
   document.body.appendChild(ov);
 }
 
-function eRows1() {
-  return (window.eT.dieteticas||[]).map((d,i)=>`
-    <tr>
-      <td><input class="cell" value="${esc(d.codigo||'')}" oninput="eT.dieteticas[${i}].codigo=this.value" placeholder="Código"></td>
-      <td><input class="cell" value="${esc(d.descripcion||'')}" oninput="eT.dieteticas[${i}].descripcion=this.value" placeholder="Descripción"></td>
-      <td><input class="cell monto" type="number" value="${d.importe||''}" oninput="eT.dieteticas[${i}].importe=parseFloat(this.value)||0;eRecalc()" placeholder="0"></td>
-      <td><button class="btn-del" onclick="eDel1(${i})">✕</button></td>
-    </tr>`).join('');
-}
+function eR1(){return(window.eT.dieteticas||[]).map((d,i)=>`<tr>
+  <td><input class="cell" value="${esc(d.codigo||'')}" oninput="eT.dieteticas[${i}].codigo=this.value" placeholder="Código"></td>
+  <td><input class="cell" value="${esc(d.descripcion||'')}" oninput="eT.dieteticas[${i}].descripcion=this.value" placeholder="Descripción"></td>
+  <td><input class="cell monto" type="number" value="${d.importe||''}" oninput="eT.dieteticas[${i}].importe=parseFloat(this.value)||0;eRC()" placeholder="0"></td>
+  <td><button class="btn-del" onclick="eD1(${i})">✕</button></td>
+</tr>`).join('');}
 
-function eRows2() {
-  return (window.eT.clientes||[]).map((c,i)=>`
-    <tr>
-      <td>${c.fixed
-        ? `<input class="cell fijo" value="${esc(c.codigo||'')}" readonly>`
-        : `<input class="cell" value="${esc(c.codigo||'')}" oninput="eT.clientes[${i}].codigo=this.value" placeholder="Código">`}
-      </td>
-      <td><input class="cell monto" type="number" value="${c.importe||''}" oninput="eT.clientes[${i}].importe=parseFloat(this.value)||0;eRecalc()" placeholder="0"></td>
-      <td>${c.fixed?'':'<button class="btn-del" onclick="eDel2('+i+')">✕</button>'}</td>
-    </tr>`).join('');
-}
+function eR2(){return(window.eT.clientes||[]).map((c,i)=>`<tr>
+  <td>${c.fixed?`<input class="cell fijo" value="${esc(c.codigo||'')}" readonly>`:`<input class="cell" value="${esc(c.codigo||'')}" oninput="eT.clientes[${i}].codigo=this.value" placeholder="Código">`}</td>
+  <td><input class="cell monto" type="number" value="${c.importe||''}" oninput="eT.clientes[${i}].importe=parseFloat(this.value)||0;eRC()" placeholder="0"></td>
+  <td>${c.fixed?'':'<button class="btn-del" onclick="eD2('+i+')">✕</button>'}</td>
+</tr>`).join('');}
 
-function eRecalc() {
+function eRC(){
   const t1=(window.eT.dieteticas||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
   const t2=(window.eT.clientes||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
   const el=document.getElementById('eTot'); if(el) el.textContent=fmt(t1+t2);
 }
-
-function eDel1(i) { window.eT.dieteticas.splice(i,1); document.getElementById('et1').innerHTML=eRows1(); eRecalc(); }
-function eDel2(i) {
+function eD1(i){window.eT.dieteticas.splice(i,1);document.getElementById('et1').innerHTML=eR1();eRC();}
+function eD2(i){
   if(window.eT.clientes[i]?.fixed){toast('No se puede eliminar un cliente fijo',1);return;}
-  window.eT.clientes.splice(i,1); document.getElementById('et2').innerHTML=eRows2(); eRecalc();
+  window.eT.clientes.splice(i,1);document.getElementById('et2').innerHTML=eR2();eRC();
 }
-function eAdd1() { window.eT.dieteticas.push({codigo:'',descripcion:'galletas rotas',importe:0}); document.getElementById('et1').innerHTML=eRows1(); }
-function eAdd2() { window.eT.clientes.push({codigo:'',importe:0,fixed:false}); document.getElementById('et2').innerHTML=eRows2(); }
+function eA1(){window.eT.dieteticas.push({codigo:'',descripcion:'galletas rotas',importe:0});document.getElementById('et1').innerHTML=eR1();}
+function eA2(){window.eT.clientes.push({codigo:'',importe:0,fixed:false});document.getElementById('et2').innerHTML=eR2();}
 
-async function guardarEdit() {
+async function guardarEdit(){
   const t1=(window.eT.dieteticas||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
   const t2=(window.eT.clientes||[]).reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
   window.eT.total1=t1; window.eT.total2=t2; window.eT.totalSemanal=t1+t2;
-
-  if (window._firebaseOk && window.eT._fbKey && window._editarSemana) {
-    try {
-      await window._editarSemana(window.eT._fbKey, window.eT);
-      cerrar('ovEdit'); toast('✅ Cambios guardados');
-    } catch(e) { toast('Error al guardar',1); }
+  if(window._firebaseOk&&window.eT._fbKey&&window._editarSemana){
+    try{await window._editarSemana(window.eT._fbKey,window.eT);cerrar('ovE');toast('✅ Cambios guardados');}
+    catch(e){toast('Error al guardar',1);}
   } else {
     let h=JSON.parse(localStorage.getItem('hd')||'[]');
     const i=h.findIndex(x=>x.guardadoEn===window.eT.guardadoEn);
     if(i>=0) h[i]=window.eT; else h.unshift(window.eT);
     localStorage.setItem('hd',JSON.stringify(h));
-    window._historial=h; renderHistorial(h);
-    cerrar('ovEdit'); toast('✅ Cambios guardados');
+    window._historial=h; renderHistorial(h); cerrar('ovE'); toast('✅ Cambios guardados');
   }
 }
 
-// ---- BORRAR ----
-function confirmarBorrar(idx) {
-  const s = getSorted()[idx];
-  if (!s) return;
-  const ov = document.createElement('div');
-  ov.className='overlay'; ov.id='ovBorrar';
-  ov.innerHTML=`
-    <div class="modal" style="max-width:320px;text-align:center;">
-      <div style="font-size:2.5rem;margin-bottom:8px;">⚠️</div>
-      <h3 style="color:#1a2e22;font-size:1.1rem;margin-bottom:8px;">¿Borrar esta semana?</h3>
-      <p style="color:#4a6b55;font-size:0.9rem;line-height:1.5;">
-        <strong>📅 ${fFecha(s.fecha)}</strong><br>
-        Total: <strong style="font-family:monospace">${fmt(s.totalSemanal||0)}</strong>
-      </p>
-      <p style="color:#e74c3c;font-size:0.8rem;margin-top:8px;">Esta acción no se puede deshacer.</p>
-      <div style="display:flex;gap:10px;margin-top:16px;">
-        <button onclick="cerrar('ovBorrar')" style="flex:1;padding:11px;border:2px solid var(--border);background:white;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;">Cancelar</button>
-        <button onclick="ejecutarBorrar(${idx})" style="flex:1;padding:11px;background:#e74c3c;border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;color:white;">Sí, borrar</button>
-      </div>
-    </div>`;
+// BORRAR
+function confirmarBorrar(idx){
+  const s=getSorted()[idx]; if(!s)return;
+  const ov=document.createElement('div'); ov.className='overlay'; ov.id='ovB';
+  ov.innerHTML=`<div class="modal" style="max-width:320px;text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:8px">⚠️</div>
+    <h3 style="color:#1a2e22;font-size:1.1rem;margin-bottom:8px">¿Borrar esta semana?</h3>
+    <p style="color:#4a6b55;font-size:.9rem;line-height:1.5">
+      <strong>📅 ${fF(s.fecha)}</strong><br>Total: <strong style="font-family:monospace">${fmt(s.totalSemanal||0)}</strong>
+    </p>
+    <p style="color:#e74c3c;font-size:.8rem;margin-top:8px">Esta acción no se puede deshacer.</p>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button onclick="cerrar('ovB')" style="flex:1;padding:11px;border:2px solid var(--bd);background:#fff;border-radius:10px;font-family:'Sora',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer">Cancelar</button>
+      <button onclick="ejBorrar(${idx})" style="flex:1;padding:11px;background:#e74c3c;border:none;border-radius:10px;font-family:'Sora',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;color:#fff">Sí, borrar</button>
+    </div>
+  </div>`;
   document.body.appendChild(ov);
 }
 
-async function ejecutarBorrar(idx) {
-  const s = getSorted()[idx];
-  cerrar('ovBorrar');
-  if (!s) return;
-  if (window._firebaseOk && s._fbKey && window._borrarSemana) {
-    try { await window._borrarSemana(s._fbKey); toast('🗑️ Semana borrada'); }
-    catch(e) { toast('Error al borrar',1); }
+async function ejBorrar(idx){
+  const s=getSorted()[idx]; cerrar('ovB'); if(!s)return;
+  if(window._firebaseOk&&s._fbKey&&window._borrarSemana){
+    try{await window._borrarSemana(s._fbKey);toast('🗑️ Semana borrada');}
+    catch(e){toast('Error al borrar',1);}
   } else {
     let h=JSON.parse(localStorage.getItem('hd')||'[]');
     h=h.filter(x=>x.guardadoEn!==s.guardadoEn);
@@ -526,10 +549,9 @@ async function ejecutarBorrar(idx) {
   }
 }
 
-// ---- UTILS ----
-function cerrar(id) { const el=document.getElementById(id); if(el) el.remove(); }
-function limpiar() { if(!confirm('¿Limpiar el formulario?')) return; setLunes(); initR1(); initR2(); }
-function toast(msg,err=0) {
+function cerrar(id){const el=document.getElementById(id);if(el)el.remove();}
+function limpiar(){if(!confirm('¿Limpiar el formulario?'))return;setLunes();initR1();initR2();}
+function toast(msg,err=0){
   const t=document.getElementById('toast');
   t.textContent=msg; t.className='toast'+(err?' err':'')+' show';
   setTimeout(()=>t.classList.remove('show'),3000);
